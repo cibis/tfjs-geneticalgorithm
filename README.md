@@ -26,6 +26,8 @@ node examples\boston-housing\run-workers.js
 ```
 node examples\boston-housing\run-kubernetes.js
 ```
+![](https://github.com/cibis/tfjs-geneticalgorithm/blob/master/_runtime/screenshots/loss-chart.jpg?raw=true)
+![](https://github.com/cibis/tfjs-geneticalgorithm/blob/master/_runtime/screenshots/final.jpg?raw=true)
 
 Section Links : [Constructor](#constructor) , [Kubernetes](#kubernetes), [Tests](#tests), [Coming-Next](#coming-next)
 # Constructor
