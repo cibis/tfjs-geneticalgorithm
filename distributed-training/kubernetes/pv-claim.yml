@@ -1,0 +1,12 @@
+#kubectl apply -f pv-claim.yml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: job-tfjs-node-claim
+spec:
+  storageClassName: manual
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 3Gi

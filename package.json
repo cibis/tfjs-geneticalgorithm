@@ -1,17 +1,14 @@
 {
-  "name": "geneticalgorithm",
-  "version": "1.0.2",
-  "description": "a general purpose genetic algorithm, an A.I. tool useful for machine evolution and adaptation",
+  "name": "tfjs-geneticalgorithm",
+  "version": "1.0.0",
+  "description": "Train/Evolve/Optimize tensorflow js models with a genetic algorithm. Forked from https://github.com/panchishin/geneticalgorithm",
   "main": "index.js",
-  "devDependencies": {
-    "expresso": "0.9.2"
-  },
-  "scripts": {
-    "test": "expresso test/*"
-  },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/panchishin/geneticalgorithm.git"
+    "url": "git+https://github.com/cibis/tfjs-geneticalgorithm.git"
+  },
+  "scripts": {
+    "test": "mocha"
   },
   "keywords": [
     "genetic",
@@ -19,17 +16,28 @@
     "genetic algorithm",
     "geneticalgorithm",
     "artificial evolution",
-    "evolve"
+    "evolve",
+    "tensorflowjs",
+    "tfjs"
   ],
-  "author": "Anton Panchishin",
+  "author": "Alexandru Cibotari(Forked)",
   "license": "Unlicense",
-  "homepage": "https://github.com/panchishin/geneticalgorithm",
-  "dependencies": {},
+  "homepage": "https://github.com/cibis/tfjs-geneticalgorithm",
   "bugs": {
-    "url": "https://github.com/panchishin/geneticalgorithm/issues"
+    "url": "https://github.com/cibis/tfjs-geneticalgorithm/issues"
   },
   "directories": {
     "example": "examples",
     "test": "test"
+  },
+  "devDependencies": {
+    "mocha": "^10.4.0",
+    "papaparse": "^5.4.1"
+  },
+  "dependencies": {
+    "@tensorflow/tfjs-node": "^4.20.0",
+    "@kubernetes/client-node": "^0.21.0",
+    "amqplib": "^0.10.4",
+    "asciichart": "^1.5.25"
   }
 }
