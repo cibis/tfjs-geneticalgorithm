@@ -55,6 +55,7 @@ var config = {
 
         /* below settings required only for distributed processing */
         parallelProcessing: true,
+        /* number of parallel workers */
         parallelism: taskSettings.parallelism,
         modelTrainingFuction: async () =>{
           /*
