@@ -22,7 +22,7 @@ node examples\boston-housing\run-basic.js
 ```
 node examples\boston-housing\run-workers.js
 ```
-- Kubernetes Job(minikube. requires some [pre-configuration](#kubernetes):
+- Kubernetes Job(minikube. requires some [pre-configuration](#kubernetes)):
 ```
 node examples\boston-housing\run-kubernetes.js
 ```
