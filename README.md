@@ -45,13 +45,27 @@ var config = {
         baseline: taskSettings.baseline,
         tensors: BostonHousing.getTensor(),
         parameterMutationFunction: (oldPhenotype) => {
-			//build new phenotype. check examples\boston-housing\run-*** for examples
-			return newPhenotype;
-		},
-		modelBuilderFunction: (phenotype) => { 
-			//build tfjs model based on phenotype parameters. check examples\boston-housing\run-*** for examples
-			return model;
-		}
+          //build new phenotype. check examples\boston-housing\run-*** for examples
+          return newPhenotype;
+        },
+        modelBuilderFunction: (phenotype) => { 
+          //build tfjs model based on phenotype parameters. check examples\boston-housing\run-*** for examples
+          return model;
+        },
+
+        /* below settings required only for distributed processing */
+        parallelProcessing: true,
+        parallelism: taskSettings.parallelism,
+        modelTrainingFuction: async () =>{
+          /*
+            worker object from:
+            distributed-training/kubernetes/worker_starter/WorkerTraining - for kubernetes
+            distributed-training/workers/worker_starter/WorkerTraining - for nodejs workers
+          */
+          var workerResponse = await worker.trainModel(phenotype, modelJson, this.tensors, this.validationSplit, this.modelAbortThreshold, this.modelTrainingTimeThreshold);
+          phenotype.epochs = workerResponse.phenotype.epochs;
+          return { validationLoss: workerResponse.validationLoss }
+        }
 }
 
 var ga = TFJSGeneticAlgorithmConstructor( config )
