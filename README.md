@@ -1,9 +1,9 @@
 
 Train/Evolve/Optimize tensorflow js models with a genetic algorithm. Forked from [panchishin/geneticalgorithm](https://github.com/panchishin/geneticalgorithm)
 
-Original code was updated to enable asyncrounous and distributed evolution with extra functionality to facilitate tensorflow.js model structure and hyperparameter evolution and optimization.
+Original code was updated to enable asynchronous and distributed evolution with extra functionality to facilitate tensorflow.js model structure and hyperparameter evolution and optimization.
 
-Genetic Algorithms(GA) when using for model evolution is a time consuming process so one of the main problems was to speed up the process by using asyncrounus and distributed model traing.  This package covers three execution modes:
+Genetic Algorithms(GA) when using for model evolution is a time consuming process so one of the main problems was to speed up the process by using asyncrounus and distributed model training.  This package covers three execution modes:
 - Single Thread
 - Node.js Workers
 - Kubernetes Job(minikube)
@@ -13,7 +13,7 @@ GA evolution resulting models are stored in the _runtime\best subfolder and can 
 node examples\boston-housing\run-best-saved-models.js
 ```
 
-The examples/boston-housing sub-folder allows you to run the [boston-housing](https://github.com/tensorflow/tfjs-examples/blob/master/boston-housing) example against the GA alghoritm 
+The examples/boston-housing sub-folder allows you to run the [boston-housing](https://github.com/tensorflow/tfjs-examples/blob/master/boston-housing) example against the GA algorithm 
 - Single Thread: 
 ```
 node examples\boston-housing\run-basic.js
@@ -26,8 +26,8 @@ node examples\boston-housing\run-workers.js
 ```
 node examples\boston-housing\run-kubernetes.js
 ```
-![](https://github.com/cibis/tfjs-geneticalgorithm/blob/master/_runtime/screenshots/loss-chart.jpg?raw=true)
-![](https://github.com/cibis/tfjs-geneticalgorithm/blob/master/_runtime/screenshots/final.jpg?raw=true)
+![](_runtime/screenshots/loss-chart.jpg?raw=true)
+![](_runtime/screenshots/final.jpg?raw=true)
 
 Section Links : [Constructor](#constructor) , [Kubernetes](#kubernetes), [Tests](#tests), [Coming-Next](#coming-next)
 # Constructor
@@ -98,7 +98,13 @@ cd distributed-training\kubernetes
 kubectl apply -f pv-claim.yml
 kubectl apply -f pv-volume.yml
 ```
+### How it works
+WorkerTraining class is creating a job in the kubernetes cluster and the job in its turn is creating a number of pods matching the parallelism parameter. The communication with the workers running in the pods is done using rabbitmq running in the cluster. After the evolution operation is completed the job is deleted together with the pods.
+![](_runtime/screenshots/kb.jpg?raw=true)
+
+
 # Coming-Next
 - Adding the more complicated jena-weather example that includes mlp,mlp-l2,linear-regression, mlp-dropout, simpleRNN and gru model types
-- Using files for passing large traning data to the workers
+- Using files for passing large training data to the workers
 - Adding the possibility for custom training data loading functionality on the worker
+- Kubernetes only - support for tensorflow python workers
