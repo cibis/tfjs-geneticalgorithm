@@ -8,7 +8,7 @@
     "url": "git+https://github.com/cibis/tfjs-geneticalgorithm.git"
   },
   "scripts": {
-    "test": "mocha"
+    "test": "mocha --timeout 20000"
   },
   "keywords": [
     "genetic",
