@@ -31,7 +31,7 @@ const tf = require('@tensorflow/tfjs-node');
 
 const LOCAL_JENA_WEATHER_CSV_PATH = './jena_climate_2009_2016.csv';
 const REMOTE_JENA_WEATHER_CSV_PATH =
-    'https://storage.googleapis.com/learnjs-data/jena_climate/jena_climate_2009_2016.csv';
+  'https://storage.googleapis.com/learnjs-data/jena_climate/jena_climate_2009_2016.csv';
 
 /**
  * A class that fetches and processes the Jena weather archive data.
@@ -40,7 +40,7 @@ const REMOTE_JENA_WEATHER_CSV_PATH =
  * batches of training or validation data.
  */
 class JenaWeatherData {
-  constructor() {}
+  constructor() { }
 
   /**
    * Load and preprocess data.
@@ -53,15 +53,15 @@ class JenaWeatherData {
     let response;
     try {
       response = await fetch(LOCAL_JENA_WEATHER_CSV_PATH);
-    } catch (err) {}
+    } catch (err) { }
 
     if (response != null &&
-        (response.statusCode === 200 || response.statusCode === 304)) {
+      (response.statusCode === 200 || response.statusCode === 304)) {
       console.log('Loading data from local path');
     } else {
       response = await fetch(REMOTE_JENA_WEATHER_CSV_PATH);
       console.log(
-          `Loading data from remote path: ${REMOTE_JENA_WEATHER_CSV_PATH}`);
+        `Loading data from remote path: ${REMOTE_JENA_WEATHER_CSV_PATH}`);
     }
     const csvData = await response.text();
 
@@ -97,8 +97,8 @@ class JenaWeatherData {
       const parsed = this.parseDateTime_(items[0]);
       const newDateTime = parsed.date;
       if (this.dateTime.length > 0 &&
-          newDateTime.getTime() <=
-              this.dateTime[this.dateTime.length - 1].getTime()) {
+        newDateTime.getTime() <=
+        this.dateTime[this.dateTime.length - 1].getTime()) {
       }
 
       this.dateTime.push(newDateTime);
@@ -110,7 +110,7 @@ class JenaWeatherData {
     this.numColumns = this.data[0].length;
     this.numColumnsExcludingTarget = this.data[0].length - 1;
     console.log(
-        `this.numColumnsExcludingTarget = ${this.numColumnsExcludingTarget}`);
+      `this.numColumnsExcludingTarget = ${this.numColumnsExcludingTarget}`);
 
     await this.calculateMeansAndStddevs_();
   }
@@ -140,10 +140,10 @@ class JenaWeatherData {
     const date = new Date(Date.UTC(year, month, day, hours, minutes, seconds));
     const yearOnset = new Date(year, 0, 1);
     const normalizedDayOfYear =
-        (date - yearOnset) / (366 * 1000 * 60 * 60 * 24);
+      (date - yearOnset) / (366 * 1000 * 60 * 60 * 24);
     const dayOnset = new Date(year, month, day);
     const normalizedTimeOfDay = (date - dayOnset) / (1000 * 60 * 60 * 24)
-    return {date, normalizedDayOfYear, normalizedTimeOfDay};
+    return { date, normalizedDayOfYear, normalizedTimeOfDay };
   }
 
 
@@ -162,7 +162,7 @@ class JenaWeatherData {
       for (const columnName of this.dataColumnNames) {
         // TODO(cais): See if we can relax this limit.
         const data =
-            tf.tensor1d(this.getColumnData(columnName).slice(0, 6 * 24 * 365));
+          tf.tensor1d(this.getColumnData(columnName).slice(0, 6 * 24 * 365));
         const moments = tf.moments(data);
         this.means.push(moments.mean.dataSync());
         this.stddevs.push(Math.sqrt(moments.variance.dataSync()));
@@ -206,7 +206,7 @@ class JenaWeatherData {
   }
 
   getColumnData(
-      columnName, includeTime, normalize, beginIndex, length, stride) {
+    columnName, includeTime, normalize, beginIndex, length, stride) {
     const columnIndex = this.dataColumnNames.indexOf(columnName);
     tf.util.assert(columnIndex >= 0, `Invalid column name: ${columnName}`);
 
@@ -221,11 +221,11 @@ class JenaWeatherData {
     }
     const out = [];
     for (let i = beginIndex; i < beginIndex + length && i < this.numRows;
-         i += stride) {
+      i += stride) {
       let value = normalize ? this.normalizedData[i][columnIndex] :
-                              this.data[i][columnIndex];
+        this.data[i][columnIndex];
       if (includeTime) {
-        value = {x: this.dateTime[i].getTime(), y: value};
+        value = { x: this.dateTime[i].getTime(), y: value };
       }
       out.push(value);
     }
@@ -270,8 +270,8 @@ class JenaWeatherData {
    *     `[batchSize, 1]`.
    */
   getNextBatchFunction(
-      shuffle, lookBack, delay, batchSize, step, minIndex, maxIndex, normalize,
-      includeDateTime) {
+    shuffle, lookBack, delay, batchSize, step, minIndex, maxIndex, normalize,
+    includeDateTime) {
     let startIndex = minIndex + lookBack;
     const lookBackSlices = Math.floor(lookBack / step);
 
@@ -301,7 +301,7 @@ class JenaWeatherData {
         startIndex += numExamples;
 
         const featureLength =
-            includeDateTime ? this.numColumns + 2 : this.numColumns;
+          includeDateTime ? this.numColumns + 2 : this.numColumns;
         const samples = tf.buffer([numExamples, lookBackSlices, featureLength]);
         const targets = tf.buffer([numExamples, 1]);
         // Iterate over examples. Each example contains a number of rows.
@@ -327,14 +327,14 @@ class JenaWeatherData {
             }
 
             const value = normalize ?
-                this.normalizedData[r + delay][this.tempCol] :
-                this.data[r + delay][this.tempCol];
+              this.normalizedData[r + delay][this.tempCol] :
+              this.data[r + delay][this.tempCol];
             targets.set(value, j, 0);
             exampleRow++;
           }
         }
         return {
-          value: {xs: samples.toTensor(), ys: targets.toTensor()},
+          value: { xs: samples.toTensor(), ys: targets.toTensor() },
           done
         };
       }
@@ -366,12 +366,12 @@ const VAL_MAX_ROW = 300000;
  *   prediction.
  */
 async function getBaselineMeanAbsoluteError(
-    jenaWeatherData, normalize, includeDateTime, lookBack, step, delay) {
+  jenaWeatherData, normalize, includeDateTime, lookBack, step, delay) {
   const batchSize = 128;
   const dataset = tf.data.generator(
-      () => jenaWeatherData.getNextBatchFunction(
-          false, lookBack, delay, batchSize, step, VAL_MIN_ROW, VAL_MAX_ROW,
-          normalize, includeDateTime));
+    () => jenaWeatherData.getNextBatchFunction(
+      false, lookBack, delay, batchSize, step, VAL_MIN_ROW, VAL_MAX_ROW,
+      normalize, includeDateTime));
 
   const batchMeanAbsoluteErrors = [];
   const batchSizes = [];
@@ -381,17 +381,17 @@ async function getBaselineMeanAbsoluteError(
     const timeSteps = features.shape[1];
     batchSizes.push(features.shape[0]);
     batchMeanAbsoluteErrors.push(tf.tidy(
-        () => tf.losses.absoluteDifference(
-            targets,
-            features.gather([timeSteps - 1], 1).gather([1], 2).squeeze([2]))));
+      () => tf.losses.absoluteDifference(
+        targets,
+        features.gather([timeSteps - 1], 1).gather([1], 2).squeeze([2]))));
   });
 
   const meanAbsoluteError = tf.tidy(() => {
     const batchSizesTensor = tf.tensor1d(batchSizes);
     const batchMeanAbsoluteErrorsTensor = tf.stack(batchMeanAbsoluteErrors);
     return batchMeanAbsoluteErrorsTensor.mul(batchSizesTensor)
-        .sum()
-        .div(batchSizesTensor.sum());
+      .sum()
+      .div(batchSizesTensor.sum());
   });
   tf.dispose(batchMeanAbsoluteErrors);
   return meanAbsoluteError.dataSync()[0];
@@ -405,8 +405,8 @@ async function getBaselineMeanAbsoluteError(
  */
 function buildLinearRegressionModel(inputShape) {
   const model = tf.sequential();
-  model.add(tf.layers.flatten({inputShape}));
-  model.add(tf.layers.dense({units: 1}));
+  model.add(tf.layers.flatten({ inputShape }));
+  model.add(tf.layers.dense({ units: 1 }));
   return model;
 }
 
@@ -424,13 +424,13 @@ function buildLinearRegressionModel(inputShape) {
  */
 function buildMLPModel(inputShape, kernelRegularizer, dropoutRate) {
   const model = tf.sequential();
-  model.add(tf.layers.flatten({inputShape}));
+  model.add(tf.layers.flatten({ inputShape }));
   model.add(
-      tf.layers.dense({units: 32, kernelRegularizer, activation: 'relu'}));
+    tf.layers.dense({ units: 32, kernelRegularizer, activation: 'relu' }));
   if (dropoutRate > 0) {
-    model.add(tf.layers.dropout({rate: dropoutRate}));
+    model.add(tf.layers.dropout({ rate: dropoutRate }));
   }
-  model.add(tf.layers.dense({units: 1}));
+  model.add(tf.layers.dense({ units: 1 }));
   return model;
 }
 
@@ -444,8 +444,8 @@ function buildMLPModel(inputShape, kernelRegularizer, dropoutRate) {
 function buildSimpleRNNModel(inputShape) {
   const model = tf.sequential();
   const rnnUnits = 32;
-  model.add(tf.layers.simpleRNN({units: rnnUnits, inputShape}));
-  model.add(tf.layers.dense({units: 1}));
+  model.add(tf.layers.simpleRNN({ units: rnnUnits, inputShape }));
+  model.add(tf.layers.dense({ units: 1 }));
   return model;
 }
 
@@ -468,7 +468,7 @@ function buildGRUModel(inputShape, dropout, recurrentDropout) {
     dropout: dropout || 0,
     recurrentDropout: recurrentDropout || 0
   }));
-  model.add(tf.layers.dense({units: 1}));
+  model.add(tf.layers.dense({ units: 1 }));
   return model;
 }
 
@@ -505,7 +505,7 @@ function buildModel(modelType, numTimeSteps, numFeatures) {
     throw new Error(`Unsupported model type: ${modelType}`);
   }
 
-  model.compile({loss: 'meanAbsoluteError', optimizer: 'rmsprop'});
+  model.compile({ loss: 'meanAbsoluteError', optimizer: 'rmsprop' });
   model.summary();
   return model;
 }
@@ -532,42 +532,49 @@ function buildModel(modelType, numTimeSteps, numFeatures) {
  *   `onEpochEnd` fields.
  */
 async function trainModel(
-    model, jenaWeatherData, normalize, includeDateTime, lookBack, step, delay,
-    batchSize, epochs, customCallback) {
-    const trainShuffle = true;
-    const trainDataset =
-        tf.data
-            .generator(
-                () => jenaWeatherData.getNextBatchFunction(
-                    trainShuffle, lookBack, delay, batchSize, step, TRAIN_MIN_ROW,
-                    TRAIN_MAX_ROW, normalize, includeDateTime))
-            .prefetch(8);
-
-    const evalShuffle = false;
-    const valDataset = tf.data.generator(
+  model, jenaWeatherData, normalize, includeDateTime, lookBack, step, delay,
+  batchSize, epochs, customCallback) {
+  const trainShuffle = true;
+  const trainDataset =
+    tf.data
+      .generator(
         () => jenaWeatherData.getNextBatchFunction(
-            evalShuffle, lookBack, delay, batchSize, step, VAL_MIN_ROW,
-            VAL_MAX_ROW, normalize, includeDateTime));
+          trainShuffle, lookBack, delay, batchSize, step, TRAIN_MIN_ROW,
+          TRAIN_MAX_ROW, normalize, includeDateTime))
+      .prefetch(8);
 
-      await model.fitDataset(trainDataset, {
-        batchesPerEpoch: 500,
-        epochs,
-        callbacks: customCallback,
-        validationData: valDataset
-      });
+  const evalShuffle = false;
+  const valDataset = tf.data.generator(
+    () => jenaWeatherData.getNextBatchFunction(
+      evalShuffle, lookBack, delay, batchSize, step, VAL_MIN_ROW,
+      VAL_MAX_ROW, normalize, includeDateTime));
 
-    // var tensors = {
-    //     trainFeatures: [],
-    //     trainTarget: [],
-    // };
-    // console.log("prepare data");
-    // await trainDataset.forEachAsync(tc => { tensors.trainFeatures.push(tc.xs); tensors.trainTarget.push(tc.ys); });
-    // console.log("model.fit");
-    // await model.fit(tensors.trainFeatures, tensors.trainTarget, {
-    //     epochs,
-    //     callbacks: customCallback,
-    //     validationSplit: 0.2
-    // });
+  await model.fitDataset(trainDataset, {
+    batchesPerEpoch: 500,
+    epochs,
+    callbacks: customCallback,
+    validationData: valDataset
+  });
+
+
+  const result = await model.evaluateDataset(valDataset, {
+    valDataset: 500
+  });
+
+  const testLoss = result.dataSync()[0].toFixed(4);
+  console.log(`TEST LOSS: ${testLoss}`);
+  // var tensors = {
+  //     trainFeatures: [],
+  //     trainTarget: [],
+  // };
+  // console.log("prepare data");
+  // await trainDataset.forEachAsync(tc => { tensors.trainFeatures.push(tc.xs); tensors.trainTarget.push(tc.ys); });
+  // console.log("model.fit");
+  // await model.fit(tensors.trainFeatures, tensors.trainTarget, {
+  //     epochs,
+  //     callbacks: customCallback,
+  //     validationSplit: 0.2
+  // });
 }
 
 
@@ -575,30 +582,44 @@ let jenaWeatherData;
 
 
 async function run() {
-    const lookBack = 10 * 24 * 6;  // Look back 10 days.
-    const step = 6;                // 1-hour steps.
-    const delay = 24 * 6;          // Predict the weather 1 day later.
-    const batchSize = 128;
-    const normalize = true;
-    const includeDateTime = false;
-    const epochs = 20; 
+  const lookBack = 10 * 24 * 6;  // Look back 10 days.
+  const step = 6;                // 1-hour steps.
+  const delay = 24 * 6;          // Predict the weather 1 day later.
+  const batchSize = 128;
+  const normalize = true;
+  const includeDateTime = false;
+  const epochs = 2;
 
-    console.log('Loading Jena weather data (41.2 MB)...');
-    jenaWeatherData = new JenaWeatherData();
-    await jenaWeatherData.load();
-    console.log('Done loading Jena weather data.');
+  console.log('Loading Jena weather data (41.2 MB)...');
+  jenaWeatherData = new JenaWeatherData();
+  await jenaWeatherData.load();
+  console.log('Done loading Jena weather data.');
 
-    var modelType = "mlp"; //"mlp-l2", "mlp-dropout", "linear-regression"
-    let numFeatures = jenaWeatherData.getDataColumnNames().length;
-    const model = buildModel(modelType, Math.floor(lookBack / step), numFeatures);
+  var modelType = "mlp"; //"mlp-l2", "mlp-dropout", "linear-regression"
+  let numFeatures = jenaWeatherData.getDataColumnNames().length;
+  const model = buildModel(modelType, Math.floor(lookBack / step), numFeatures);
 
-    console.log('Starting model training...');
-    
-    await trainModel(
-        model, jenaWeatherData, normalize, includeDateTime,
-        lookBack, step, delay, batchSize, epochs);
+  console.log('Starting model training...');
+  var trainLogs = [];
 
-    console.log('Model training complete...');
+  await trainModel(
+    model, jenaWeatherData, normalize, includeDateTime,
+    lookBack, step, delay, batchSize, epochs, {
+    onEpochEnd: async (epoch, logs) => {
+      trainLogs.push(logs);
+    }
+  });
+
+  console.log('Model training complete...');
+
+  const trainLoss = trainLogs[trainLogs.length - 1].loss.toFixed(4);
+  const valLoss = trainLogs[trainLogs.length - 1].val_loss.toFixed(4);
+  console.log("\n============================================================");
+
+  console.log(
+    `Final train-set loss: ${trainLoss}\n` +
+    `Final validation-set loss: ${valLoss}\n`);
+  console.log("\n============================================================");
 }
 
 run();
