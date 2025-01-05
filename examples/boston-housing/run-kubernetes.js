@@ -4,6 +4,8 @@ var WorkerTraining = require("../../distributed-training/kubernetes/worker_start
 var TFJSGeneticAlgorithmConstructor = require("../../index")
 var ModelStorage = require("../../model-storage/current")
 var utils = require("../../utils")
+var ExampleDataService = require('../example-data-service');
+var DataService = require('../../data-service');
 
 async function testPredefinedModelsAgainstGA() {
     var bestPredefinedModelLoss = await BostonHousing.runPredefinedModels();
@@ -38,7 +40,7 @@ async function testPredefinedModelsAgainstGA() {
                     var workerResponse = await worker.trainModel(phenotype, modelJson, this.tensors, this.validationSplit, this.modelAbortThreshold, this.modelTrainingTimeThreshold);
                     phenotype.epochs = workerResponse.phenotype.epochs;
                     console.log(`Model training completed. loss ${workerResponse.validationLoss}`);
-                    return { validationLoss: workerResponse.validationLoss }
+                    return { validationLoss: parseFloat(workerResponse.validationLoss) }
                 }
                 catch (err) {
                     console.log(`Error: ${err} stack: ${err.stack}`)
@@ -47,7 +49,11 @@ async function testPredefinedModelsAgainstGA() {
             },
             populationSize: taskSettings.populationSize,
             baseline: taskSettings.baseline,
-            tensors: BostonHousing.getTensor(),
+            tensors: new DataService.DataSetSources(
+                new DataService.DataSetSource("host.minikube.internal", "/boston-housing-training", "3000"),
+                new DataService.DataSetSource("host.minikube.internal", "/boston-housing-validation", "3000")
+            ),
+            //tensors: BostonHousing.getTensor(),
             parameterMutationFunction: (oldPhenotype) => {
                 if (!oldPhenotype) {
                     return {
@@ -124,6 +130,7 @@ async function testPredefinedModelsAgainstGA() {
         ModelStorage.copyToBest(bestModel, "boston-housing");
         console.log(`Best predefined models loss after cloneCompete ${cloneCompetePredefinedModel.validationLoss}`)
         console.log(`Best GA models loss after cloneCompete ${bestModel.validationLoss}`)
+        console.log(` cloneCompetePredefinedModel.validationLoss ${typeof cloneCompetePredefinedModel.validationLoss}, bestModel.validationLoss ${typeof bestModel.validationLoss} `)
         if (cloneCompetePredefinedModel.validationLoss > bestModel.validationLoss) {
             console.log("Genetic Algorithm WON!!!");
         }
@@ -138,6 +145,7 @@ async function testPredefinedModelsAgainstGA() {
         console.log(`${Date.now()} worker.stopJob`)
         await worker.stopJob();
     }
+    process.exit(0);
 }
 
 testPredefinedModelsAgainstGA();

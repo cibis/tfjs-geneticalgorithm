@@ -2,6 +2,8 @@ const tf = require('@tensorflow/tfjs-node');
 const BostonHousing = require('./boston-housing')
 var TFJSGeneticAlgorithmConstructor = require("../../index")
 var ModelStorage = require("../../model-storage/current")
+var ExampleDataService = require('../example-data-service');
+var DataService = require('../../data-service');
 
 async function testPredefinedModelsAgainstGA() {
     var bestPredefinedModelLoss = await BostonHousing.runPredefinedModels();
@@ -27,7 +29,10 @@ async function testPredefinedModelsAgainstGA() {
         */
         populationSize: taskSettings.populationSize,
         baseline: taskSettings.baseline,
-        tensors: BostonHousing.getTensor(),
+        tensors: new DataService.DataSetSources(
+            new DataService.DataSetSource("127.0.0.1", "/boston-housing-training", "3000"),
+            new DataService.DataSetSource("127.0.0.1", "/boston-housing-validation", "3000")
+        ),//BostonHousing.getTensor(),
         parameterMutationFunction: (oldPhenotype) => {
             if (!oldPhenotype) {
                 return {
@@ -111,6 +116,7 @@ async function testPredefinedModelsAgainstGA() {
     else{
         console.log("Genetic Algorithm lost :( ");
     }
+    process.exit(0);
 }
 
 testPredefinedModelsAgainstGA();

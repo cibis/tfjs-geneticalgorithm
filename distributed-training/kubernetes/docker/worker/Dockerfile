@@ -1,4 +1,4 @@
-FROM node
+FROM node:22
 
 # Install tfjs-node
 RUN yarn add seedrandom@^3.0.5

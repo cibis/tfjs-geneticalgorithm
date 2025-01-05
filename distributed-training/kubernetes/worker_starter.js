@@ -177,12 +177,13 @@ module.exports = class WorkerTraining extends DistributedTrainingInterface {
                         workerData: { 
                             phenotype: phenotype, 
                             modelJson : modelJson, 
-                            tensors: JSON.stringify({ 
-                                trainFeatures: tensors.trainFeatures.arraySync(), 
-                                trainTarget: tensors.trainTarget.arraySync(), 
-                                testFeatures: tensors.testFeatures.arraySync(), 
-                                testTarget: tensors.testTarget.arraySync()
-                            }), 
+                            // tensors: JSON.stringify({ 
+                            //     trainFeatures: tensors.trainFeatures.arraySync(), 
+                            //     trainTarget: tensors.trainTarget.arraySync(), 
+                            //     testFeatures: tensors.testFeatures.arraySync(), 
+                            //     testTarget: tensors.testTarget.arraySync()
+                            // }), 
+                            tensors: tensors,
                             validationSplit: validationSplit, 
                             modelAbortThreshold: modelAbortThreshold,
                             modelTrainingTimeThreshold: modelTrainingTimeThreshold

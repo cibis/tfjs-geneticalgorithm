@@ -2,6 +2,7 @@ const { Worker, isMainThread, parentPort, workerData } = require('worker_threads
 const tf = require('@tensorflow/tfjs-node');
 var ModelStorage = require("../../model-storage/current")
 var utils = require("../../utils")
+var DataService = require('../../data-service');
 
 function guidGenerator() {
   var S4 = function () {
@@ -16,13 +17,37 @@ async function trainModel() {
     console.log(`Worker ${wguid} started`);
 
     var phenotype = workerData.phenotype;
-    var tensorsAsArrays = JSON.parse(workerData.tensors);
-    var tensors = {
-      trainFeatures: tf.tensor(tensorsAsArrays.trainFeatures),
-      trainTarget: tf.tensor(tensorsAsArrays.trainTarget),
-      testFeatures: tf.tensor(tensorsAsArrays.testFeatures),
-      testTarget: tf.tensor(tensorsAsArrays.testTarget)
-    };
+    // var tensorsAsArrays = JSON.parse(workerData.tensors);
+    // var tensors = {
+    //   trainFeatures: tf.tensor(tensorsAsArrays.trainFeatures),
+    //   trainTarget: tf.tensor(tensorsAsArrays.trainTarget),
+    //   testFeatures: tf.tensor(tensorsAsArrays.testFeatures),
+    //   testTarget: tf.tensor(tensorsAsArrays.testTarget)
+    // };
+    const trainDataset =
+      tf.data
+        .generator(
+          () => new DataService.DataSet(
+            workerData.tensors.trainingDataSetSource.host,
+            workerData.tensors.trainingDataSetSource.path,
+            workerData.tensors.trainingDataSetSource.port, { first : (1 - workerData.validationSplit) * 100 }).getNextBatchFunction()
+        );
+    const trainValidationDataset =
+      tf.data
+        .generator(
+          () => new DataService.DataSet(
+            workerData.tensors.trainingDataSetSource.host,
+            workerData.tensors.trainingDataSetSource.path,
+            workerData.tensors.trainingDataSetSource.port, { last : workerData.validationSplit * 100 }).getNextBatchFunction()
+        );        
+    const valDataset =
+      tf.data
+        .generator(
+          () => new DataService.DataSet(
+            workerData.tensors.validationDataSetSource.host,
+            workerData.tensors.validationDataSetSource.path,
+            workerData.tensors.validationDataSetSource.port).getNextBatchFunction()
+        );
     var modelAbortThreshold = workerData.modelAbortThreshold;
     var modelTrainingTimeThreshold = workerData.modelTrainingTimeThreshold;
     var validationSplit = workerData.validationSplit;
@@ -38,34 +63,38 @@ async function trainModel() {
       model.compile(
         { optimizer: utils.optimizerBuilderFunction(phenotype.optimizer, phenotype.learningRate), loss: phenotype.loss });
       var trainingStartTime = Date.now();
-      await model.fit(tensors.trainFeatures, tensors.trainTarget, {
-        verbose: false,
-        batchSize: phenotype.batchSize,
-        epochs: phenotype.epochs,
-        validationSplit: validationSplit,
-        callbacks: {
-          onEpochEnd: async (epoch, logs) => {
-            trainLogs.push(logs);
-            if (isNaN(logs.val_loss)) {
-              console.log(`Early model loss is NaN abort. Epoch ${epoch} `);
-              errorAbort = true;
-              throw Error("Loss is NaN");
-            }
-            if (modelTrainingTimeThreshold && Date.now() > trainingStartTime + modelTrainingTimeThreshold * 1000) {
-              console.log(`Early model training timeout abort. Epoch ${epoch} `);
-              errorAbort = true;
-              throw Error("Model training timeout abort");
-            }
-            if (modelAbortThreshold && trainLogs.length > modelAbortThreshold && trainLogs[trainLogs.length - modelAbortThreshold].val_loss <= logs.val_loss) {
-              //console.log(`Early model training abort(${lossThresholdAbortCnt+1}). Epoch ${epoch}. loss compare ` + trainLogs[trainLogs.length - modelAbortThreshold].val_loss + " <= " + logs.val_loss);
-              lossThresholdAbort = true;
-              throw Error("Early training abort");
+      await model.fitDataset(
+        trainDataset,
+        //tensors.trainFeatures, tensors.trainTarget,
+        {
+          verbose: false,
+          //batchSize: phenotype.batchSize,
+          epochs: phenotype.epochs,
+          //validationSplit: validationSplit,
+          validationData: trainValidationDataset,
+          callbacks: {
+            onEpochEnd: async (epoch, logs) => {
+              trainLogs.push(logs);
+              if (isNaN(logs.val_loss)) {
+                console.log(`Early model loss is NaN abort. Epoch ${epoch} `);
+                errorAbort = true;
+                throw Error("Loss is NaN");
+              }
+              if (modelTrainingTimeThreshold && Date.now() > trainingStartTime + modelTrainingTimeThreshold * 1000) {
+                console.log(`Early model training timeout abort. Epoch ${epoch} `);
+                errorAbort = true;
+                throw Error("Model training timeout abort");
+              }
+              if (modelAbortThreshold && trainLogs.length > modelAbortThreshold && trainLogs[trainLogs.length - modelAbortThreshold].val_loss <= logs.val_loss) {
+                //console.log(`Early model training abort(${lossThresholdAbortCnt+1}). Epoch ${epoch}. loss compare ` + trainLogs[trainLogs.length - modelAbortThreshold].val_loss + " <= " + logs.val_loss);
+                lossThresholdAbort = true;
+                throw Error("Early training abort");
+              }
             }
           }
-        }
-      }).catch((err) => {
-        if (!lossThresholdAbort && !errorAbort) console.log(err)
-      });
+        }).catch((err) => {
+          if (!lossThresholdAbort && !errorAbort) console.log(err)
+        });
 
       if (errorAbort) {
         return { validationLoss: NaN, phenotype: phenotype };
@@ -84,9 +113,11 @@ async function trainModel() {
     } while (lossThresholdAbort)
 
     
-    const result = model.evaluate(
-      tensors.testFeatures, tensors.testTarget, { batchSize: phenotype.batchSize });
-    const testLoss = result.dataSync()[0].toFixed(4);
+    const result = await model.evaluateDataset(
+      valDataset
+      //tensors.testFeatures, tensors.testTarget, { batchSize: phenotype.batchSize }
+    );
+    const testLoss = parseFloat(result.dataSync()[0].toFixed(4));
     const trainLoss = trainLogs[trainLogs.length - 1].loss.toFixed(4);
     const valLoss = trainLogs[trainLogs.length - 1].val_loss.toFixed(4);
     // console.log("\n============================================================");
@@ -104,7 +135,7 @@ async function trainModel() {
     phenotype.validationLoss = testLoss;
     await ModelStorage.writeModel(phenotype._id, model);
     
-    console.log("Model training completed. loss " + testLoss);
+    console.log(`Model training completed. post training eval loss ${testLoss}, training validation-set loss: ${valLoss}, train-set loss: ${trainLoss}`);
 
     return { validationLoss: testLoss, phenotype: phenotype/*,  modelJson: modelJson*/ };
   }

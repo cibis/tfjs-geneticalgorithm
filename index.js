@@ -4,6 +4,7 @@ const utils = require('./utils')
 
 var geneticAlgorithmConstructor = require("./genetic-algorithm")
 var ModelStorage = require("./model-storage/current")
+var DataService = require('./data-service');
 
 module.exports = function TFJSGeneticAlgorithmConstructor(options) {
     var startTime, endTime;
@@ -73,12 +74,41 @@ module.exports = function TFJSGeneticAlgorithmConstructor(options) {
                     var trainingStartTime = Date.now();
 
                     var lossThresholdAbortCnt = 0;
+
+
+                    const trainDataset =
+                        tf.data
+                            .generator(
+                                () => new DataService.DataSet(
+                                    this.tensors.trainingDataSetSource.host,
+                                    this.tensors.trainingDataSetSource.path,
+                                    this.tensors.trainingDataSetSource.port, { first : (1-this.validationSplit) * 100 }).getNextBatchFunction()
+                            );
+                    const trainValidationDataset =
+                        tf.data
+                            .generator(
+                                () => new DataService.DataSet(
+                                    this.tensors.trainingDataSetSource.host,
+                                    this.tensors.trainingDataSetSource.path,
+                                    this.tensors.trainingDataSetSource.port, { last : this.validationSplit * 100 }).getNextBatchFunction()
+                            );                            
+                    const valDataset =
+                        tf.data
+                            .generator(
+                                () => new DataService.DataSet(
+                                    this.tensors.validationDataSetSource.host,
+                                    this.tensors.validationDataSetSource.path,
+                                    this.tensors.validationDataSetSource.port).getNextBatchFunction()
+                            );
+
+
                     do {
-                        await model.fit(this.tensors.trainFeatures, this.tensors.trainTarget, {
+                        await model.fitDataset(trainDataset, {
                             verbose: false,
-                            batchSize: phenotype.batchSize,
+                            //batchSize: phenotype.batchSize,
                             epochs: phenotype.epochs,
-                            validationSplit: this.validationSplit,
+                            //validationSplit: this.validationSplit,
+                            validationData: trainValidationDataset,
                             callbacks: {
                                 onEpochEnd: async (epoch, logs) => {
                                     trainLogs.push(logs);
@@ -117,9 +147,11 @@ module.exports = function TFJSGeneticAlgorithmConstructor(options) {
                           }
                     } while (lossThresholdAbort)
                     
-                    const result = model.evaluate(
-                        this.tensors.testFeatures, this.tensors.testTarget, { batchSize: phenotype.batchSize });
-                    const testLoss = result.dataSync()[0].toFixed(4);
+                    const result = await model.evaluateDataset(
+                        valDataset
+                        //, { batchSize: phenotype.batchSize }
+                    );
+                    const testLoss = parseFloat(result.dataSync()[0].toFixed(4));
                     const trainLoss = trainLogs[trainLogs.length - 1].loss.toFixed(4);
                     const valLoss = trainLogs[trainLogs.length - 1].val_loss.toFixed(4);
                     // console.log("\n============================================================");
@@ -135,7 +167,7 @@ module.exports = function TFJSGeneticAlgorithmConstructor(options) {
                     // const modelJson = JSON.stringify(savedModel);
                     phenotype.validationLoss = testLoss;
                     await ModelStorage.writeModel(phenotype._id, model);
-                    console.log("Model training completed. loss " + testLoss);
+                    console.log(`Model training completed. post training eval loss ${testLoss}, training validation-set loss: ${valLoss}, train-set loss: ${trainLoss}`);
                     return { validationLoss: testLoss }
                 }
                 catch (err) { 
@@ -180,7 +212,7 @@ module.exports = function TFJSGeneticAlgorithmConstructor(options) {
             initPhenotype(phenotype);
             var model = settings.modelBuilderFunction(phenotype);
             var trainingRes = (await settings.modelTrainingFuction(phenotype, model));
-            var validationLoss = trainingRes.validationLoss;
+            var validationLoss = parseFloat(trainingRes.validationLoss);
             phenotype._type = 'CLONE';
             phenotype.validationLoss = validationLoss;
             //phenotype.modelJson = trainingRes.modelJson;
@@ -193,7 +225,7 @@ module.exports = function TFJSGeneticAlgorithmConstructor(options) {
             var validationLoss = (await settings.modelTrainingFuction(phenotype, model)).validationLoss;
             phenotype._id = utils.guidGenerator();
             phenotype._type = 'MUTATION';
-            phenotype.validationLoss = validationLoss;
+            phenotype.validationLoss = parseFloat(validationLoss);
             return phenotype;
         },
 
@@ -210,8 +242,8 @@ module.exports = function TFJSGeneticAlgorithmConstructor(options) {
             initPhenotype(b);
             var amodel = settings.modelBuilderFunction(a);
             var bmodel = settings.modelBuilderFunction(b);
-            var aValidationLoss = (await settings.modelTrainingFuction(a, amodel)).validationLoss;
-            var bValidationLoss = (await settings.modelTrainingFuction(b, bmodel)).validationLoss;
+            var aValidationLoss = parseFloat((await settings.modelTrainingFuction(a, amodel)).validationLoss);
+            var bValidationLoss = parseFloat((await settings.modelTrainingFuction(b, bmodel)).validationLoss);
             a._id = utils.guidGenerator();
             b._id = utils.guidGenerator();
             a._type = 'CROSSOVER';

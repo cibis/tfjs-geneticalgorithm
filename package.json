@@ -31,12 +31,13 @@
     "test": "test"
   },
   "devDependencies": {
+    "express": "^4.21.2",
     "mocha": "^10.4.0",
     "papaparse": "^5.4.1"
   },
   "dependencies": {
-    "@tensorflow/tfjs-node": "^4.20.0",
     "@kubernetes/client-node": "^0.21.0",
+    "@tensorflow/tfjs-node": "^4.20.0",
     "amqplib": "^0.10.4",
     "asciichart": "^1.5.25"
   }
