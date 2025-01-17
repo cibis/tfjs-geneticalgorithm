@@ -64,6 +64,7 @@ module.exports = function TFJSGeneticAlgorithmConstructor(options) {
             validationSplit: 0.2,
             populationSize: 100,
             bestPresenceFactor: 2,
+            batchesPerEpoch: undefined,
 
             //change it to return the model so it can be saved to the file system and the loss
             modelTrainingFuction: async function (phenotype, model) {
@@ -82,15 +83,23 @@ module.exports = function TFJSGeneticAlgorithmConstructor(options) {
                                 () => new DataService.DataSet(
                                     this.tensors.trainingDataSetSource.host,
                                     this.tensors.trainingDataSetSource.path,
-                                    this.tensors.trainingDataSetSource.port, { first : (1-this.validationSplit) * 100 }).getNextBatchFunction()
-                            );
+                                    this.tensors.trainingDataSetSource.port, 
+                                    this.tensors.trainingDataSetSource.cache_id, 
+                                    this.tensors.trainingDataSetSource.cache_batch_size, 
+                                    { first : (1-this.validationSplit) * 100, batch_size: phenotype.batchSize }
+                                ).getNextBatchFunction()
+                            )
                     const trainValidationDataset =
                         tf.data
                             .generator(
                                 () => new DataService.DataSet(
                                     this.tensors.trainingDataSetSource.host,
                                     this.tensors.trainingDataSetSource.path,
-                                    this.tensors.trainingDataSetSource.port, { last : this.validationSplit * 100 }).getNextBatchFunction()
+                                    this.tensors.trainingDataSetSource.port, 
+                                    this.tensors.trainingDataSetSource.cache_id,  
+                                    this.tensors.trainingDataSetSource.cache_batch_size,                                     
+                                    { last : this.validationSplit * 100, batch_size: phenotype.batchSize }
+                                ).getNextBatchFunction()
                             );                            
                     const valDataset =
                         tf.data
@@ -98,13 +107,18 @@ module.exports = function TFJSGeneticAlgorithmConstructor(options) {
                                 () => new DataService.DataSet(
                                     this.tensors.validationDataSetSource.host,
                                     this.tensors.validationDataSetSource.path,
-                                    this.tensors.validationDataSetSource.port).getNextBatchFunction()
+                                    this.tensors.validationDataSetSource.port,
+                                    this.tensors.validationDataSetSource.cache_id,
+                                    this.tensors.validationDataSetSource.cache_batch_size,
+                                    { batch_size: phenotype.batchSize }                                   
+                                ).getNextBatchFunction()
                             );
 
 
                     do {
                         await model.fitDataset(trainDataset, {
                             verbose: false,
+                            batchesPerEpoch: this.batchesPerEpoch,
                             //batchSize: phenotype.batchSize,
                             epochs: phenotype.epochs,
                             //validationSplit: this.validationSplit,

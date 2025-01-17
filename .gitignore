@@ -2,3 +2,4 @@ timelapse
 node_modules
 npm-debug.log
 models
+cache

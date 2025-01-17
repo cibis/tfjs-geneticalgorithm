@@ -8,6 +8,7 @@ var DataService = require('../../data-service');
 const BATCH_SIZE = 40;
 
 async function main() {
+    await ExampleDataService.load();
     var betsModels = ModelStorage.listBestModels();
     await BostonHousing.runPredefinedModels();
     var tensors = BostonHousing.getTensor();

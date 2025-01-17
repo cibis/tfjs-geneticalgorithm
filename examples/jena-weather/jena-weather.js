@@ -57,11 +57,11 @@ class JenaWeatherData {
 
     if (response != null &&
       (response.statusCode === 200 || response.statusCode === 304)) {
-      console.log('Loading data from local path');
+      //console.log('Loading data from local path');
     } else {
       response = await fetch(REMOTE_JENA_WEATHER_CSV_PATH);
-      console.log(
-        `Loading data from remote path: ${REMOTE_JENA_WEATHER_CSV_PATH}`);
+      // console.log(
+      //   `Loading data from remote path: ${REMOTE_JENA_WEATHER_CSV_PATH}`);
     }
     const csvData = await response.text();
 
@@ -109,8 +109,8 @@ class JenaWeatherData {
     this.numRows = this.data.length;
     this.numColumns = this.data[0].length;
     this.numColumnsExcludingTarget = this.data[0].length - 1;
-    console.log(
-      `this.numColumnsExcludingTarget = ${this.numColumnsExcludingTarget}`);
+    // console.log(
+    //   `this.numColumnsExcludingTarget = ${this.numColumnsExcludingTarget}`);
 
     await this.calculateMeansAndStddevs_();
   }
@@ -167,8 +167,8 @@ class JenaWeatherData {
         this.means.push(moments.mean.dataSync());
         this.stddevs.push(Math.sqrt(moments.variance.dataSync()));
       }
-      console.log('means:', this.means);
-      console.log('stddevs:', this.stddevs);
+      // console.log('means:', this.means);
+      // console.log('stddevs:', this.stddevs);
     });
 
     // Cache normalized values.
@@ -298,6 +298,7 @@ class JenaWeatherData {
         }
 
         const numExamples = rowIndices.length;
+        //console.log(numExamples)
         startIndex += numExamples;
 
         const featureLength =
@@ -581,21 +582,19 @@ async function trainModel(
 let jenaWeatherData;
 
 
-async function run() {
+async function run(modelType, jenaWeatherData) {
   const lookBack = 10 * 24 * 6;  // Look back 10 days.
   const step = 6;                // 1-hour steps.
   const delay = 24 * 6;          // Predict the weather 1 day later.
   const batchSize = 128;
   const normalize = true;
   const includeDateTime = false;
-  const epochs = 2;
+  const epochs = 20;
 
   console.log('Loading Jena weather data (41.2 MB)...');
-  jenaWeatherData = new JenaWeatherData();
-  await jenaWeatherData.load();
   console.log('Done loading Jena weather data.');
 
-  var modelType = "mlp"; //"mlp-l2", "mlp-dropout", "linear-regression"
+  //var modelType = "mlp"; //"mlp-l2", "mlp-dropout", "linear-regression"
   let numFeatures = jenaWeatherData.getDataColumnNames().length;
   const model = buildModel(modelType, Math.floor(lookBack / step), numFeatures);
 
@@ -613,13 +612,46 @@ async function run() {
   console.log('Model training complete...');
 
   const trainLoss = trainLogs[trainLogs.length - 1].loss.toFixed(4);
-  const valLoss = trainLogs[trainLogs.length - 1].val_loss.toFixed(4);
+  const valLoss = parseFloat(trainLogs[trainLogs.length - 1].val_loss.toFixed(4));
   console.log("\n============================================================");
 
   console.log(
     `Final train-set loss: ${trainLoss}\n` +
     `Final validation-set loss: ${valLoss}\n`);
   console.log("\n============================================================");
+
+  return valLoss;
 }
 
-run();
+var runPredefinedModels = module.exports.runPredefinedModels = async function (jenaWeatherData) {  
+  console.log("\nTraining/Testing models with predefined structure.");
+  
+  // console.log("\n==============================mlp==============================");
+  // var bestLoss = await run("mlp", jenaWeatherData);
+
+  // console.log("\n===========================mlp-l2===========================");
+  // bestLoss = Math.min(bestLoss, await run("mlp-l2", jenaWeatherData));  
+
+  // console.log("\n===========================mlp-dropout===========================");
+  // bestLoss = Math.min(bestLoss, await run("mlp-dropout", jenaWeatherData)); 
+  bestLoss = 1000
+  console.log("\n===========================linear-regression===========================");
+  bestLoss = Math.min(bestLoss, await run("linear-regression", jenaWeatherData)); 
+
+  console.log("\n===========================simpleRNN===========================");
+  bestLoss = Math.min(bestLoss, await run("simpleRNN", jenaWeatherData)); 
+
+  console.log("\n===========================gru===========================");
+  bestLoss = Math.min(bestLoss, await run("gru", jenaWeatherData)); 
+  
+  console.log("\n============================================================");
+  return bestLoss;
+
+}
+
+module.exports.JenaWeatherData = JenaWeatherData;
+
+
+// module.exports.loaded = (callback)=>{
+//   if(callback) callback();
+// };

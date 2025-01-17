@@ -7,6 +7,7 @@ var ExampleDataService = require('../example-data-service');
 var DataService = require('../../data-service');
 
 async function testPredefinedModelsAgainstGA() {
+    await ExampleDataService.load();
     var bestPredefinedModelLoss = await BostonHousing.runPredefinedModels();
     var bostonData = BostonHousing.getBostonData();
     console.log(`Best predefined models validation-set loss ${bestPredefinedModelLoss}\n`)
@@ -44,8 +45,8 @@ async function testPredefinedModelsAgainstGA() {
         populationSize: taskSettings.populationSize,
         baseline: taskSettings.baseline,
         tensors: new DataService.DataSetSources(
-            new DataService.DataSetSource("127.0.0.1", "/boston-housing-training", "3000"),
-            new DataService.DataSetSource("127.0.0.1", "/boston-housing-validation", "3000")
+            new DataService.DataSetSource("127.0.0.1", "/boston-housing-training", "3000", "boston-housing-training", 333),
+            new DataService.DataSetSource("127.0.0.1", "/boston-housing-validation", "3000", "boston-housing-validation", 173)
         ),//BostonHousing.getTensor(),
         parameterMutationFunction: (oldPhenotype) => {
             if (!oldPhenotype) {

@@ -30,7 +30,11 @@ async function trainModel() {
           () => new DataService.DataSet(
             workerData.tensors.trainingDataSetSource.host,
             workerData.tensors.trainingDataSetSource.path,
-            workerData.tensors.trainingDataSetSource.port, { first : (1 - workerData.validationSplit) * 100 }).getNextBatchFunction()
+            workerData.tensors.trainingDataSetSource.port, 
+            workerData.tensors.trainingDataSetSource.cache_id, 
+            workerData.tensors.trainingDataSetSource.cache_batch_size, 
+            { first : (1 - workerData.validationSplit) * 100, batch_size: phenotype.batchSize }
+          ).getNextBatchFunction()
         );
     const trainValidationDataset =
       tf.data
@@ -38,7 +42,11 @@ async function trainModel() {
           () => new DataService.DataSet(
             workerData.tensors.trainingDataSetSource.host,
             workerData.tensors.trainingDataSetSource.path,
-            workerData.tensors.trainingDataSetSource.port, { last : workerData.validationSplit * 100 }).getNextBatchFunction()
+            workerData.tensors.trainingDataSetSource.port, 
+            workerData.tensors.trainingDataSetSource.cache_id, 
+            workerData.tensors.trainingDataSetSource.cache_batch_size,             
+            { last : workerData.validationSplit * 100, batch_size: phenotype.batchSize }
+          ).getNextBatchFunction()
         );        
     const valDataset =
       tf.data
@@ -46,7 +54,11 @@ async function trainModel() {
           () => new DataService.DataSet(
             workerData.tensors.validationDataSetSource.host,
             workerData.tensors.validationDataSetSource.path,
-            workerData.tensors.validationDataSetSource.port).getNextBatchFunction()
+            workerData.tensors.validationDataSetSource.port,
+            workerData.tensors.trainingDataSetSource.cache_id, 
+            workerData.tensors.trainingDataSetSource.cache_batch_size, 
+            { batch_size: phenotype.batchSize }
+          ).getNextBatchFunction()
         );
     var modelAbortThreshold = workerData.modelAbortThreshold;
     var modelTrainingTimeThreshold = workerData.modelTrainingTimeThreshold;

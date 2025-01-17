@@ -1,1 +1,18 @@
-{"epochs":380,"batchSize":81,"learningRate":0.00996326625387118,"hiddenLayers":3,"hiddenLayerUnits":12,"activation":"sigmoid","kernelInitializer":"heUniform","optimizer":"adadelta","loss":"meanSquaredError","_id":"0cfb3118-640e-e65b-7b00-3f40d779f51e","validationLoss":14.2844,"_type":"CLONE","executionTime":"00:43:32","evolveGenerations":5,"elitesGenerations":2,"group":"boston-housing"}
+{
+    "epochs": 380,
+    "batchSize": 81,
+    "learningRate": 0.00996326625387118,
+    "hiddenLayers": 3,
+    "hiddenLayerUnits": 12,
+    "activation": "sigmoid",
+    "kernelInitializer": "heUniform",
+    "optimizer": "adadelta",
+    "loss": "meanSquaredError",
+    "_id": "0cfb3118-640e-e65b-7b00-3f40d779f51e",
+    "validationLoss": 14.2844,
+    "_type": "CLONE",
+    "executionTime": "00:43:32",
+    "evolveGenerations": 5,
+    "elitesGenerations": 2,
+    "group": "boston-housing"
+}
