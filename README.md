@@ -43,7 +43,10 @@ The minimal configuration for constructing a GeneticAlgorithm calculator is like
 var config = {
         populationSize: taskSettings.populationSize,
         baseline: taskSettings.baseline,
-        tensors: BostonHousing.getTensor(),
+        tensors: new DataService.DataSetSources(
+            new DataService.DataSetSource("127.0.0.1", "/boston-housing-training", "3000", "boston-housing-training", 333),
+            new DataService.DataSetSource("127.0.0.1", "/boston-housing-validation", "3000", "boston-housing-validation", 173)
+        ),
         parameterMutationFunction: (oldPhenotype) => {
           //build new phenotype. check examples\boston-housing\run-*** for examples
           return newPhenotype;
