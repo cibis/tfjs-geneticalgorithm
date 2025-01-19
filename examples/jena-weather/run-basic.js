@@ -49,7 +49,7 @@ async function testPredefinedModelsAgainstGA() {
         parameterMutationFunction: (oldPhenotype) => {
             if (!oldPhenotype) {
                 return {
-                    epochs: 1,
+                    epochs: 20,
                     batchSize: 128,
                     learningRate: 0.01,
                     hiddenLayers: 1,
@@ -66,7 +66,7 @@ async function testPredefinedModelsAgainstGA() {
             }
             else {
                 var newPhenotype = {
-                    epochs: ga.mutateNumber(oldPhenotype.epochs, true, 50, true, 70),
+                    epochs: ga.mutateNumber(oldPhenotype.epochs, true, 50, true, 20),
                     batchSize: ga.mutateNumber(oldPhenotype.batchSize, true, 50, true, 10),
                     learningRate: ga.mutateNumber(oldPhenotype.learningRate, false, 100, true),
                     hiddenLayerUnits: ga.mutateNumber(oldPhenotype.hiddenLayerUnits, true, 100, true, 1, 300),
