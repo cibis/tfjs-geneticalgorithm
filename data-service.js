@@ -139,35 +139,27 @@ class DataSet {
                     var targetCacheBatchIndex = Math.floor(this.index * this.options.batch_size / this.cache_batch_size);
                     var nextCacheBatchIndex = Math.floor((this.index + 1) * this.options.batch_size / this.cache_batch_size);
                     var indexWithinTheCacheBatch = ((this.index * this.options.batch_size) % this.cache_batch_size);
-                    var moreBatchesInTheCacheBatch = (this.cache_batch_size % this.options.batch_size) - 1 > this.index;
-                    //console.log(`index: ${this.index}, batch_size: ${this.options.batch_size}, cache_batch_size: ${this.cache_batch_size}, targetCacheBatchIndex: ${targetCacheBatchIndex}, indexWithinTheCacheBatch: ${indexWithinTheCacheBatch}, maxBatchIndex: ${maxBatchIndex}, options: ${JSON.stringify(this.options)}, path: ${this.path}, moreBatchesInTheCacheBatch: ${moreBatchesInTheCacheBatch}`)
+                    var moreBatchesInTheCacheBatch = (this.cache_batch_size % this.options.batch_size) - 1 > this.index;                    
                     var entierCacheBatch = lastLoadedCacheBatch;
                     if (lastLoadedCacheBatchIndex == null || targetCacheBatchIndex != lastLoadedCacheBatchIndex)
                         entierCacheBatch = JSON.parse(fs.readFileSync(`${cacheFileDir}${targetCacheBatchIndex}.json`));
                     lastLoadedCacheBatch = entierCacheBatch;
                     lastLoadedCacheBatchIndex = targetCacheBatchIndex;
                     var itemsLeftInTheCacheBatchToAdd = Math.min(entierCacheBatch.xs.length - indexWithinTheCacheBatch, this.options.batch_size);
-                    //console.log(`itemsLeftInTheCacheBatchToAdd: ${itemsLeftInTheCacheBatchToAdd}`)
                     var batch = { xs: entierCacheBatch.xs.slice(indexWithinTheCacheBatch, indexWithinTheCacheBatch + itemsLeftInTheCacheBatchToAdd), ys: entierCacheBatch.ys.slice(indexWithinTheCacheBatch, indexWithinTheCacheBatch + itemsLeftInTheCacheBatchToAdd) };
-                    //console.log(`batch.xs.length: ${batch.xs.length}`);
                     if(batch.xs.length < this.options.batch_size && !moreBatchesInTheCacheBatch && fs.existsSync(`${cacheFileDir}${nextCacheBatchIndex}.json`)){
                         //since cache batch is bigger than a training batch
                         //next cache batch should have enough items for the training batch
-                        targetCacheBatchIndex++;
-                        //console.log(`get the rest, index: ${this.index}, batch_size: ${this.options.batch_size}, cache_batch_size: ${this.cache_batch_size}, targetCacheBatchIndex: ${targetCacheBatchIndex}, indexWithinTheCacheBatch: ${indexWithinTheCacheBatch}, maxBatchIndex: ${maxBatchIndex}, options: ${JSON.stringify(this.options)}, path: ${this.path}, moreBatchesInTheCacheBatch: ${moreBatchesInTheCacheBatch}`)
+                        targetCacheBatchIndex++;                        
                         entierCacheBatch = JSON.parse(fs.readFileSync(`${cacheFileDir}${targetCacheBatchIndex}.json`));
                         lastLoadedCacheBatch = entierCacheBatch;
                         lastLoadedCacheBatchIndex = targetCacheBatchIndex;
                         batch.xs = batch.xs.concat(entierCacheBatch.xs.slice(0, this.options.batch_size - batch.xs.length));
                         batch.ys = batch.ys.concat(entierCacheBatch.ys.slice(0, this.options.batch_size - batch.ys.length));
-                        //console.log(`batch.xs.length: ${batch.xs.length}`);
                     }
                     
                     this.index++;
-                    //maxCacheBatchIndex should not be used. maxBatchIndex and the index should be checked against it
                     var done = this.index > maxBatchIndex || (!moreBatchesInTheCacheBatch && !fs.existsSync(`${cacheFileDir}${nextCacheBatchIndex}.json`));
-                    //if(done) console.log(`done: ${done}`);
-                    //console.log('\n\n\n');
                     return { value: { xs: tf.tensor(batch.xs), ys: tf.tensor(batch.ys) }, done: done };                    
                 }
             };
