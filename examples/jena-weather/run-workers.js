@@ -1,19 +1,18 @@
-//require('../../utils').initConsoleLogTimestamps();
 const tf = require('@tensorflow/tfjs-node');
 const JenaWeather = require('./jena-weather')
+var WorkerTraining = require("../../distributed-training/workers/worker_starter")
 var TFJSGeneticAlgorithmConstructor = require("../../index")
 var ModelStorage = require("../../model-storage/current")
 var ExampleDataService = require('../example-data-service');
 var DataService = require('../../data-service');
 
 async function testPredefinedModelsAgainstGA() {
-
     console.log('Loading Jena weather data (41.2 MB)...');
     jenaWeatherData = new JenaWeather.JenaWeatherData();
     await jenaWeatherData.load();
     let numFeatures = jenaWeatherData.getDataColumnNames().length;
     const lookBack = 10 * 24 * 6;  // Look back 10 days.
-    const step = 6;
+    const step = 6;   
     const inputShape = [Math.floor(lookBack / step), numFeatures];
     console.log('Done loading Jena weather data.');
 
@@ -23,6 +22,8 @@ async function testPredefinedModelsAgainstGA() {
     await ExampleDataService.load();
 
     var taskSettings = {
+        parallelism: 10,
+        //modelTrainingTimeThreshold: (60 * 15)/* 15 min */,
         populationSize: 50,
         baseline: 24,
         predefinedModelCloneCompetitionSize: 10,
@@ -32,13 +33,24 @@ async function testPredefinedModelsAgainstGA() {
     };
 
     var ga = TFJSGeneticAlgorithmConstructor({
-        /*
-        //use for distributed/parallel training
         parallelProcessing: true,
-        modelTrainingFuction: async () =>{
+        parallelism: taskSettings.parallelism,
+        modelTrainingTimeThreshold: taskSettings.modelTrainingTimeThreshold,
+        modelTrainingFuction: async function (phenotype, model) {
+            try {
+                var worker = new WorkerTraining();
 
-        },
-        */
+                await ModelStorage.writeModel(phenotype._id, model);
+
+                var workerResponse = await worker.trainModel(phenotype, this.tensors, this.validationSplit, this.modelAbortThreshold, this.modelTrainingTimeThreshold, this.batchesPerEpoch);
+                phenotype.epochs = workerResponse.phenotype.epochs;
+                return { validationLoss: parseFloat(workerResponse.validationLoss) }
+            }
+            catch (err) {
+                console.log(`Error: ${err} stack: ${err.stack}`)
+                throw err;
+            }
+        },        
         populationSize: taskSettings.populationSize,
         baseline: taskSettings.baseline,
         tensors: new DataService.DataSetSources(
@@ -101,10 +113,10 @@ async function testPredefinedModelsAgainstGA() {
                 }
                 return newPhenotype;
             }
-        },
+        },  
         modelBuilderFunction: (phenotype) => {
             const model = tf.sequential();
-
+            //console.log(`Building ${JSON.stringify(phenotype, null, "\t")}`);
             switch (phenotype.modelType) {
                 case "linear":
                     {
@@ -169,21 +181,18 @@ async function testPredefinedModelsAgainstGA() {
             }
             model.add(tf.layers.dense({ units: 1 }));
 
-            model.compile(
-                { optimizer: ga.optimizerBuilderFunction(phenotype.optimizer, phenotype.learningRate), loss: phenotype.loss });
-            //model.summary();
-
             return model;
         }
     });
 
+
     console.log("\n\nTraining/Testing models with predefined structure.\n")
-    var bestModel = await ga.evolve(taskSettings.evolveGenerations, taskSettings.elitesGenerations);
+    var bestModel = await ga.evolve(taskSettings.evolveGenerations,taskSettings.elitesGenerations);
     console.log(`Best of all GA model parameters`)
     console.log(bestModel);
     bestModel = await ga.cloneCompete(bestModel, taskSettings.finalCloneCompetitionSize);
     console.log(`Best of all GA model after cloneCompete`)
-    console.log(bestModel);
+    console.log(bestModel); 
     ModelStorage.copyToBest(bestModel, "boston-housing");
     console.log(`Best predefined models loss ${bestPredefinedModelLoss}`)
     console.log(`Best GA models loss after cloneCompete ${bestModel.validationLoss}`)

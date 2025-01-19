@@ -84,6 +84,7 @@ async function trainModel() {
           epochs: phenotype.epochs,
           //validationSplit: validationSplit,
           validationData: trainValidationDataset,
+          batchesPerEpoch: workerData.batchesPerEpoch,
           callbacks: {
             onEpochEnd: async (epoch, logs) => {
               trainLogs.push(logs);

@@ -102,9 +102,15 @@ kubectl apply -f pv-volume.yml
 WorkerTraining class is creating a job in the kubernetes cluster and the job in its turn is creating a number of pods matching the parallelism parameter. The communication with the workers running in the pods is done using rabbitmq running in the cluster. After the evolution operation is completed the job is deleted together with the pods.
 ![](_runtime/screenshots/kb.jpg?raw=true)
 
+# Jan 19 2025
+Switched model input data to DataSet
+Added Jena Weather example
+to run use any of these
+```
+node examples\jena-weather\run-basic.js
+node examples\jena-weather\run-workers.js
+node examples\jena-weather\run-kubernetes.js
+```
 
 # Coming-Next
-- Adding the more complicated jena-weather example that includes mlp,mlp-l2,linear-regression, mlp-dropout, simpleRNN and gru model types
-- Using files for passing large training data to the workers
-- Adding the possibility for custom training data loading functionality on the worker
 - Kubernetes only - support for tensorflow python workers

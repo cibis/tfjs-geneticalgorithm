@@ -8,7 +8,7 @@ module.exports = class WorkerTraining extends DistributedTrainingInterface {
 
     }
 
-    trainModel(phenotype/*, modelJson*/, tensors, validationSplit, modelAbortThreshold, modelTrainingTimeThreshold) {
+    trainModel(phenotype/*, modelJson*/, tensors, validationSplit, modelAbortThreshold, modelTrainingTimeThreshold, batchesPerEpoch) {
         return new Promise((resolve, reject) => {
             var runTask = async function (resolve, reject) {
                 try {
@@ -26,7 +26,8 @@ module.exports = class WorkerTraining extends DistributedTrainingInterface {
                             // }), 
                             validationSplit: validationSplit, 
                             modelAbortThreshold: modelAbortThreshold,
-                            modelTrainingTimeThreshold: modelTrainingTimeThreshold
+                            modelTrainingTimeThreshold: modelTrainingTimeThreshold,
+                            batchesPerEpoch: batchesPerEpoch
                         },
                       });
                       worker.on("message", (data) => {

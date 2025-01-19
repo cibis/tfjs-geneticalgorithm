@@ -29,8 +29,8 @@ module.exports = class LocalModelStorage extends ModelStorageInterface {
 
     copyToBest(phenotype, group){
         phenotype.group = group;
-        fs.writeFile(`${BEST_MODEL_STORAGE}${phenotype._id}.json`, JSON.stringify(phenotype), 'utf8',()=>{}); 
-        fs.cp(MODEL_STORAGE + phenotype._id, BEST_MODEL_STORAGE + phenotype._id, {recursive: true}, (err) => {/* callback */});
+        fs.writeFileSync(`${BEST_MODEL_STORAGE}${phenotype._id}.json`, JSON.stringify(phenotype), 'utf8'); 
+        fs.cpSync(MODEL_STORAGE + phenotype._id, BEST_MODEL_STORAGE + phenotype._id, {recursive: true});
     }
 
     listBestModels(){
