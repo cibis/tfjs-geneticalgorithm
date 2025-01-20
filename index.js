@@ -64,7 +64,6 @@ module.exports = function TFJSGeneticAlgorithmConstructor(options) {
             validationSplit: 0.2,
             populationSize: 100,
             bestPresenceFactor: 2,
-            batchesPerEpoch: undefined,
 
             //change it to return the model so it can be saved to the file system and the loss
             modelTrainingFuction: async function (phenotype, model) {
@@ -118,7 +117,6 @@ module.exports = function TFJSGeneticAlgorithmConstructor(options) {
                     do {
                         await model.fitDataset(trainDataset, {
                             verbose: false,
-                            batchesPerEpoch: this.batchesPerEpoch,
                             //batchSize: phenotype.batchSize,
                             epochs: phenotype.epochs,
                             //validationSplit: this.validationSplit,

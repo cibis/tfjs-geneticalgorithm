@@ -17,15 +17,17 @@ async function testPredefinedModelsAgainstGA() {
     const inputShape = [Math.floor(lookBack / step), numFeatures];
     console.log('Done loading Jena weather data.');
 
-    var bestPredefinedModelLoss = await JenaWeather.runPredefinedModels(jenaWeatherData);
+    var bestPredefinedModelLoss =
+        0.2797 ?? //comment this line if you want to run the jena weather example models
+        await JenaWeather.runPredefinedModels(jenaWeatherData);
     console.log(`Best predefined models validation-set loss ${bestPredefinedModelLoss}\n`)
 
     await ExampleDataService.load();
 
     var taskSettings = {
-        populationSize: 50,
+        modelTrainingTimeThreshold: (60 * 60 * 2)/* 2 h */,
+        populationSize: 30,
         baseline: 24,
-        predefinedModelCloneCompetitionSize: 10,
         evolveGenerations: 5,
         elitesGenerations: 2,
         finalCloneCompetitionSize: 10,
@@ -45,7 +47,6 @@ async function testPredefinedModelsAgainstGA() {
             new DataService.DataSetSource("127.0.0.1", "/jena-weather-training", "3000", "jena-weather-training", 1280),
             new DataService.DataSetSource("127.0.0.1", "/jena-weather-validation", "3000", "jena-weather-validation", 1280)
         ),
-        batchesPerEpoch: 500,
         parameterMutationFunction: (oldPhenotype) => {
             if (!oldPhenotype) {
                 return {

@@ -551,7 +551,6 @@ async function trainModel(
       VAL_MAX_ROW, normalize, includeDateTime));
 
   await model.fitDataset(trainDataset, {
-    batchesPerEpoch: 500,
     epochs,
     callbacks: customCallback,
     validationData: valDataset

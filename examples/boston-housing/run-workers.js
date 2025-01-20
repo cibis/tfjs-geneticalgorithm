@@ -47,7 +47,7 @@ async function testPredefinedModelsAgainstGA() {
         tensors: new DataService.DataSetSources(
             new DataService.DataSetSource("127.0.0.1", "/boston-housing-training", "3000", "boston-housing-training", 333),
             new DataService.DataSetSource("127.0.0.1", "/boston-housing-validation", "3000", "boston-housing-validation", 173)
-        ),//BostonHousing.getTensor(),
+        ),
         parameterMutationFunction: (oldPhenotype) => {
             if (!oldPhenotype) {
                 return {
