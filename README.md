@@ -106,7 +106,7 @@ WorkerTraining class is creating a job in the kubernetes cluster and the job in 
 ![](_runtime/screenshots/kb.jpg?raw=true)
 
 # Jan 19 2025
-Switched model input data to DataSet
+Switched model input data to DataSet.
 Added Jena Weather example. To run use any of these(very slow)
 ```
 node examples\jena-weather\run-basic.js
