@@ -115,6 +115,7 @@ module.exports = function TFJSGeneticAlgorithmConstructor(options) {
 
 
                     do {
+                        var epochTimeStart;
                         await model.fitDataset(trainDataset, {
                             verbose: false,
                             //batchSize: phenotype.batchSize,
@@ -122,6 +123,9 @@ module.exports = function TFJSGeneticAlgorithmConstructor(options) {
                             //validationSplit: this.validationSplit,
                             validationData: trainValidationDataset,
                             callbacks: {
+                                onEpochBegin: (epoch, logs) => {
+                                    epochTimeStart = Date.now();
+                                },  
                                 onEpochEnd: async (epoch, logs) => {
                                     trainLogs.push(logs);
                                     if (isNaN(logs.val_loss)) {
@@ -134,6 +138,12 @@ module.exports = function TFJSGeneticAlgorithmConstructor(options) {
                                         errorAbort = true;
                                         throw Error("IGNORE: Model training timeout abort");
                                     }
+                                    if (this.modelTrainingTimeThreshold && epochTimeStart && (phenotype.epochs - 1 > epoch)
+                                        && ((Date.now() - epochTimeStart) * (phenotype.epochs - epoch - 1)) > this.modelTrainingTimeThreshold * 1000) {
+                                        console.log(`Early model training timeout abort based on prior epoch time. Epoch ${epoch} `);
+                                        errorAbort = true;
+                                        throw Error("Model training timeout abort");
+                                      }  
                                     if (this.modelAbortThreshold && trainLogs.length > this.modelAbortThreshold && trainLogs[trainLogs.length - this.modelAbortThreshold].val_loss <= logs.val_loss) {
                                         //console.log(`Early model training abort. Epoch ${epoch}. loss compare ` + trainLogs[trainLogs.length - this.modelAbortThreshold].val_loss + " <= " + logs.val_loss);
                                         lossThresholdAbort = true;
@@ -179,7 +189,7 @@ module.exports = function TFJSGeneticAlgorithmConstructor(options) {
                     // const modelJson = JSON.stringify(savedModel);
                     phenotype.validationLoss = testLoss;
                     await ModelStorage.writeModel(phenotype._id, model);
-                    console.log(`Model training completed. post training eval loss ${testLoss}, training validation-set loss: ${valLoss}, train-set loss: ${trainLoss}`);
+                    console.log(`Model training completed ${phenotype._id} . post training eval loss ${testLoss}, training validation-set loss: ${valLoss}, train-set loss: ${trainLoss}`);
                     return { validationLoss: testLoss }
                 }
                 catch (err) { 

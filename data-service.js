@@ -108,20 +108,11 @@ class DataSet {
             this.options.first = parseFloat(this.options.first);
             this.options.last = parseFloat(this.options.last);
             
-            //var iterateCacheBatch = 0;
-            
             if (!itemsCnt){
-                // while (fs.existsSync(`${cacheFileDir}${iterateCacheBatch}.json`)) {
-                //     var entierCacheBatch = JSON.parse(fs.readFileSync(`${cacheFileDir}${iterateCacheBatch}.json`));
-                //     itemsCnt += entierCacheBatch.xs.length;
-                //     iterateCacheBatch++;
-                //     console.log(`counting total items. found so far: ${itemsCnt}`);
-                // }
                 var entierCacheBatch = JSON.parse(fs.readFileSync(`${cacheFileDir}0.json`));
                 itemsCnt = entierCacheBatch.itemsCnt;
             }
             var maxBatchIndex = Math.floor(itemsCnt / this.options.batch_size)-1;
-            //console.log(`MAX BATCH INDEX: ${maxBatchIndex}`);
             
             var minBatchIndex = 0;
             
@@ -139,7 +130,7 @@ class DataSet {
                     var targetCacheBatchIndex = Math.floor(this.index * this.options.batch_size / this.cache_batch_size);
                     var nextCacheBatchIndex = Math.floor((this.index + 1) * this.options.batch_size / this.cache_batch_size);
                     var indexWithinTheCacheBatch = ((this.index * this.options.batch_size) % this.cache_batch_size);
-                    var moreBatchesInTheCacheBatch = (this.cache_batch_size % this.options.batch_size) - 1 > this.index;                    
+                    var moreBatchesInTheCacheBatch = indexWithinTheCacheBatch + this.options.batch_size < this.cache_batch_size;                       
                     var entierCacheBatch = lastLoadedCacheBatch;
                     if (lastLoadedCacheBatchIndex == null || targetCacheBatchIndex != lastLoadedCacheBatchIndex)
                         entierCacheBatch = JSON.parse(fs.readFileSync(`${cacheFileDir}${targetCacheBatchIndex}.json`));

@@ -55,8 +55,8 @@ async function trainModel() {
             workerData.tensors.validationDataSetSource.host,
             workerData.tensors.validationDataSetSource.path,
             workerData.tensors.validationDataSetSource.port,
-            workerData.tensors.trainingDataSetSource.cache_id, 
-            workerData.tensors.trainingDataSetSource.cache_batch_size, 
+            workerData.tensors.validationDataSetSource.cache_id, 
+            workerData.tensors.validationDataSetSource.cache_batch_size, 
             { batch_size: phenotype.batchSize }
           ).getNextBatchFunction()
         );
@@ -71,7 +71,7 @@ async function trainModel() {
       var trainLogs = [];
       var lossThresholdAbort = false;
       var errorAbort = false;
-
+      var epochTimeStart;
       model.compile(
         { optimizer: utils.optimizerBuilderFunction(phenotype.optimizer, phenotype.learningRate), loss: phenotype.loss });
       var trainingStartTime = Date.now();
@@ -85,6 +85,9 @@ async function trainModel() {
           //validationSplit: validationSplit,
           validationData: trainValidationDataset,
           callbacks: {
+            onEpochBegin: (epoch, logs) => {
+              epochTimeStart = Date.now();
+            },  
             onEpochEnd: async (epoch, logs) => {
               trainLogs.push(logs);
               if (isNaN(logs.val_loss)) {
@@ -97,6 +100,12 @@ async function trainModel() {
                 errorAbort = true;
                 throw Error("Model training timeout abort");
               }
+              if (modelTrainingTimeThreshold && epochTimeStart && (phenotype.epochs - 1 > epoch)
+                && ((Date.now() - epochTimeStart) * (phenotype.epochs - epoch - 1)) > modelTrainingTimeThreshold * 1000) {
+                console.log(`Early model training timeout abort based on prior epoch time. Epoch ${epoch} `);
+                errorAbort = true;
+                throw Error("Model training timeout abort");
+              }              
               if (modelAbortThreshold && trainLogs.length > modelAbortThreshold && trainLogs[trainLogs.length - modelAbortThreshold].val_loss <= logs.val_loss) {
                 //console.log(`Early model training abort(${lossThresholdAbortCnt+1}). Epoch ${epoch}. loss compare ` + trainLogs[trainLogs.length - modelAbortThreshold].val_loss + " <= " + logs.val_loss);
                 lossThresholdAbort = true;
@@ -147,7 +156,7 @@ async function trainModel() {
     phenotype.validationLoss = testLoss;
     await ModelStorage.writeModel(phenotype._id, model);
     
-    console.log(`Model training completed. post training eval loss ${testLoss}, training validation-set loss: ${valLoss}, train-set loss: ${trainLoss}`);
+    console.log(`Model training completed ${phenotype._id} . post training eval loss ${testLoss}, training validation-set loss: ${valLoss}, train-set loss: ${trainLoss}`);
 
     return { validationLoss: testLoss, phenotype: phenotype/*,  modelJson: modelJson*/ };
   }
