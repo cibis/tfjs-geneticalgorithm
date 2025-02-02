@@ -292,6 +292,8 @@ var runPredefinedModels = module.exports.runPredefinedModels = async function() 
   return bestLoss;
 }
 
+module.exports.arraysToTensors = arraysToTensors;
+
 module.exports.getBostonData = () => {
   return bostonData;
 }

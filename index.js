@@ -75,7 +75,6 @@ module.exports = function TFJSGeneticAlgorithmConstructor(options) {
 
                     var lossThresholdAbortCnt = 0;
 
-
                     const trainDataset =
                         tf.data
                             .generator(

@@ -145,14 +145,17 @@ app.get("/jena-weather-validation", (req, res) => {
     });
 });
 
-async function  loadDataAndRun(params) {
+async function loadDataAndRun(params) {
     return new Promise(function (resolve, reject) {
-        jenaWeatherData.load().then(()=>{
-            app.listen(3000, () => console.log("Server is listening on port 3000"));
-            setTimeout(() => {
-                resolve();                
-            }, 1000);            
-        });
+        bostonData.loadData().then(() => {
+            BostonHousing.arraysToTensors();
+            jenaWeatherData.load().then(() => {
+                app.listen(3000, () => console.log("Server is listening on port 3000"));
+                setTimeout(() => {
+                    resolve();
+                }, 1000);
+            });
+        })
     });
 }
 

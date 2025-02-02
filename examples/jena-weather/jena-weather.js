@@ -624,16 +624,17 @@ async function run(modelType, jenaWeatherData) {
 
 var runPredefinedModels = module.exports.runPredefinedModels = async function (jenaWeatherData) {  
   console.log("\nTraining/Testing models with predefined structure.");
-  
-  // console.log("\n==============================mlp==============================");
-  // var bestLoss = await run("mlp", jenaWeatherData);
-
-  // console.log("\n===========================mlp-l2===========================");
-  // bestLoss = Math.min(bestLoss, await run("mlp-l2", jenaWeatherData));  
-
-  // console.log("\n===========================mlp-dropout===========================");
-  // bestLoss = Math.min(bestLoss, await run("mlp-dropout", jenaWeatherData)); 
   bestLoss = 1000
+
+  console.log("\n==============================mlp==============================");
+  var bestLoss = await run("mlp", jenaWeatherData);
+
+  console.log("\n===========================mlp-l2===========================");
+  bestLoss = Math.min(bestLoss, await run("mlp-l2", jenaWeatherData));  
+
+  console.log("\n===========================mlp-dropout===========================");
+  bestLoss = Math.min(bestLoss, await run("mlp-dropout", jenaWeatherData)); 
+  
   console.log("\n===========================linear-regression===========================");
   bestLoss = Math.min(bestLoss, await run("linear-regression", jenaWeatherData)); 
 
