@@ -194,7 +194,7 @@ async function testPredefinedModelsAgainstGA() {
     bestModel = await ga.cloneCompete(bestModel, taskSettings.finalCloneCompetitionSize);
     console.log(`Best of all GA model after cloneCompete`)
     console.log(bestModel); 
-    ModelStorage.copyToBest(bestModel, "boston-housing");
+    ModelStorage.copyToBest(bestModel, "jena-weather");
     console.log(`Best predefined models loss ${bestPredefinedModelLoss}`)
     console.log(`Best GA models loss after cloneCompete ${bestModel.validationLoss}`)
     if (bestPredefinedModelLoss > bestModel.validationLoss) {

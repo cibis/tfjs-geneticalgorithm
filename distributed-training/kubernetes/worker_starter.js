@@ -99,8 +99,10 @@ const isJobStarted = async (jobName) => {
 }
 
 
-const createJob = async (jobName, parallelism) => {
-    await k8sBatchApi.createNamespacedJob('default', {
+const createJob = async (jobName, parallelism, alternativeWorker) => {
+    console.log(`createJob alternativeWorker: ${alternativeWorker}`)
+    var imageName = typeof alternativeWorker != "undefined" && alternativeWorker == "python" ? 'tfjs-ks-python-worker' : 'tfjs-ks-worker'
+    var jobSettings = {
         apiVersion: 'batch/v1',
         kind: 'Job',
         metadata: {
@@ -110,7 +112,7 @@ const createJob = async (jobName, parallelism) => {
             parallelism: parallelism,
             template: {
                 metadata: {
-                    name: 'tfjs-ks-worker'
+                    name: imageName
                 },
                 spec: {
                     volumes: [
@@ -122,8 +124,8 @@ const createJob = async (jobName, parallelism) => {
                         }
                     ],
                     containers: [{
-                        image: 'tfjs-ks-worker:latest',
-                        name: 'tfjs-ks-worker',
+                        image: imageName + ':latest',
+                        name: imageName,
                         imagePullPolicy: 'Never',
                         volumeMounts: [
                             {
@@ -142,23 +144,26 @@ const createJob = async (jobName, parallelism) => {
                 }
             }
         }
-    });
+    };
+    console.log(JSON.stringify(jobSettings))
+    await k8sBatchApi.createNamespacedJob('default', jobSettings);
 
 }
 
 module.exports = class WorkerTraining extends DistributedTrainingInterface {
-    constructor(jobName, parallelism, podResponseTimeThreshold) {
+    constructor(jobName, parallelism, podResponseTimeThreshold, alternativeWorker) {
         super();
         this.jobName = jobName;
         this.outputQueuePrefix = jobName + "-OUTPUT";
         this.inputQueue = jobName + "-INPUT";
         this.parallelism = parallelism;
         this.podResponseTimeThreshold = podResponseTimeThreshold;
+        this.alternativeWorker = alternativeWorker;
         console.log(`jobName ${jobName}`);
     }
 
     async startJob() {
-        if(!(await isJobStarted(this.jobName))) await createJob(this.jobName, this.parallelism);
+        if(!(await isJobStarted(this.jobName))) await createJob(this.jobName, this.parallelism, this.alternativeWorker);
     }
 
     async stopJob() {
