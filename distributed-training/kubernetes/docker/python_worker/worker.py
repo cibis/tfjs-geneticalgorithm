@@ -8,6 +8,7 @@ import math
 from datetime import datetime
 from rabbitmq import RabbitMQ
 import traceback
+from utils import DictToObj
 
 CACHE_STORAGE = "./_runtime/cache/"
 MODEL_STORAGE = "shared/models/"
@@ -20,23 +21,7 @@ inputQueue = None #os.environ["JOB_NAME"] + "-INPUT"
 outputQueuePrefix = None #os.environ["JOB_NAME"] + "-OUTPUT"
 
 def guidGenerator():
-    return str(uuid.uuid4())
-
-def optimizerBuilderFunction(optimizer, learningRate):
-    print(f'optimizerBuilderFunction({optimizer}, {learningRate})')
-    match optimizer:
-         case "sgd":
-              return tf.keras.optimizers.SGD(learning_rate=learningRate)
-         case "adagrad":
-              return tf.keras.optimizers.Adagrad(learning_rate=learningRate)
-         case "adadelta":
-              return tf.keras.optimizers.Adadelta(learning_rate=learningRate)
-         case "adam":
-              return tf.keras.optimizers.Adam(learning_rate=learningRate)
-         case "adamax":
-              return tf.keras.optimizers.Adamax(learning_rate=learningRate)
-         case "rmsprop":
-              return tf.keras.optimizers.RMSprop(learning_rate=learningRate)                                                    
+    return str(uuid.uuid4())                                                  
 
 class DataSet:
     def __init__(self, host, path, port, cache_id, cache_batch_size, options):
@@ -155,45 +140,6 @@ class DataSet:
           return batch["xs"],batch["ys"]
 
 
-
-MAX_EPOCHS = 20
-
-def compile_and_fit_TEST(model, trainDS, trainValidationDS, steps_per_epoch, validation_steps, patience=2):
-  print(f"steps_per_epoch: {steps_per_epoch}, validation_steps: {validation_steps}")
-  early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
-                                                    patience=patience,
-                                                    mode='min')
-
-  model.compile(loss=tf.keras.losses.MeanSquaredError(),
-                optimizer=tf.keras.optimizers.RMSprop(),
-                metrics=[tf.keras.metrics.MeanAbsoluteError()])
-
-#   print(trainDS)
-#   print(trainValidationDS)
-  
-  history = model.fit(trainDS, epochs=MAX_EPOCHS, steps_per_epoch = steps_per_epoch, validation_steps = validation_steps,
-                      validation_data=trainValidationDS,
-                      callbacks=[early_stopping])
-
-  return history
-
-def trainModel_TEST(workerdata, trainDS, trainDS_genRes, trainValidationDS, trainValidationDS_genRes, validationDS, validationDS_genRes):
-    # dense = tf.keras.Sequential([
-    #     tf.keras.layers.Dense(units=64, activation='relu'),
-    #     tf.keras.layers.Dense(units=64, activation='relu'),
-    #     tf.keras.layers.Dense(units=1)
-    # ])
-    dense = tf.keras.Sequential([
-        tf.keras.layers.Flatten(),
-        tf.keras.layers.Dense(units=32, activation='relu'),
-        tf.keras.layers.Dense(units=1)
-    ])
-    history = compile_and_fit(dense, trainDS, trainValidationDS, trainDS_genRes.maxBatchIndex - trainDS_genRes.minBatchIndex, trainValidationDS_genRes.maxBatchIndex - trainValidationDS_genRes.minBatchIndex)
-
-    val_performance = dense.evaluate(validationDS, return_dict=True)
-
-    print(val_performance)
-
 def trainModel(wguid, model, workerdata, trainDS, trainDS_genRes, trainValidationDS, trainValidationDS_genRes, validationDS, validationDS_genRes, patience=2):
     early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
                                                         patience=patience,
@@ -226,22 +172,26 @@ def readQueue():
                 print(f"Worker {wguid} started")
                 message = json.loads(body.decode("utf-8"))
                 workerData = message["workerData"]
+                trainDS_genRes = ds_gen(workerData["tensors"]["trainingDataSetSource"], { "batch_size": workerData["phenotype"]["batchSize"], "first": (1-workerData["validationSplit"]) * 100 })
+                trainValidationDS_genRes = ds_gen(workerData["tensors"]["trainingDataSetSource"], { "batch_size": workerData["phenotype"]["batchSize"], "last": workerData["validationSplit"] * 100 })
+                validationDS_genRes = ds_gen(workerData["tensors"]["validationDataSetSource"], { "batch_size": workerData["phenotype"]["batchSize"] })
+
                 if buildModel == None:
                      local_ns = {}
                      exec(workerData["buildModel"], None, local_ns)
                      buildModel = local_ns["buildModel"]
-                model = buildModel(workerData)
-                trainDS_genRes = trainDS_gen()
-                trainValidationDS_genRes = trainValidationDS_gen()
-                validationDS_genRes = validationDS_gen()
+                model = buildModel(workerData, trainDS_genRes.input_shape)
+                trainDS_genRes = ds_gen(workerData["tensors"]["trainingDataSetSource"], { "batch_size": workerData["phenotype"]["batchSize"], "first": (1-workerData["validationSplit"]) * 100 })
+                trainValidationDS_genRes = ds_gen(workerData["tensors"]["trainingDataSetSource"], { "batch_size": workerData["phenotype"]["batchSize"], "last": workerData["validationSplit"] * 100 })
+                validationDS_genRes = ds_gen(workerData["tensors"]["validationDataSetSource"], { "batch_size": workerData["phenotype"]["batchSize"] })
 
-                trainDS = tf.data.Dataset.from_generator(trainDS_gen,
+                trainDS = tf.data.Dataset.from_generator(generator=lambda:ds_gen(workerData["tensors"]["trainingDataSetSource"], { "batch_size": workerData["phenotype"]["batchSize"], "first": (1-workerData["validationSplit"]) * 100 }),
                     output_types=(tf.float32, tf.float32),
                     output_shapes = (trainDS_genRes.input_shape,trainDS_genRes.output_shape))
-                trainValidationDS = tf.data.Dataset.from_generator(trainValidationDS_gen,
+                trainValidationDS = tf.data.Dataset.from_generator(generator=lambda:ds_gen(workerData["tensors"]["trainingDataSetSource"], { "batch_size": workerData["phenotype"]["batchSize"], "last": workerData["validationSplit"] * 100 }),
                     output_types=(tf.float32, tf.float32),
                     output_shapes = (trainValidationDS_genRes.input_shape,trainValidationDS_genRes.output_shape))  
-                validationDS = tf.data.Dataset.from_generator(validationDS_gen,
+                validationDS = tf.data.Dataset.from_generator(generator=lambda:ds_gen(workerData["tensors"]["validationDataSetSource"], { "batch_size": workerData["phenotype"]["batchSize"] }),
                     output_types=(tf.float32, tf.float32),
                     output_shapes = (validationDS_genRes.input_shape,validationDS_genRes.output_shape))   
                 trainRes = trainModel(wguid, model, workerData, trainDS, trainDS_genRes, trainValidationDS, trainValidationDS_genRes, validationDS, validationDS_genRes)                 
@@ -256,50 +206,42 @@ def readQueue():
     except Exception as err:
         print(traceback.format_exc())
 
-
-
 def writeQueue(id, tfjsJobResponse):
     outputQueue = f"{outputQueuePrefix}-{id}"
     rabbitmq = RabbitMQ(RABBITMQ_HOST, RABBITMQ_PORT)
     rabbitmq.publish(outputQueue, json.dumps(tfjsJobResponse))
     rabbitmq.close()  
 
-def trainDS_gen():
-     trainDS = DataSet("127.0.0.1", "/jena-weather-training", "3000", "jena-weather-training", 1280, { "batch_size" : 128, "first": 5 })
+def ds_gen(data_source, options):
+     trainDS = DataSet(data_source["host"], data_source["path"], data_source["port"], data_source["pre_cache"], data_source["cache_batch_size"], options)
      trainDS.download()
      return trainDS
 
-def trainValidationDS_gen():
-     trainValidationDS = DataSet("127.0.0.1", "/jena-weather-training", "3000", "jena-weather-training", 1280, { "batch_size" : 128, "last": 5 })
-     trainValidationDS.download()
-     return trainValidationDS
+def optimizerBuilderFunction(optimizer, learningRate):
+    print(f'optimizerBuilderFunction({optimizer}, {learningRate})')
+    match optimizer:
+         case "sgd":
+              return tf.keras.optimizers.SGD(learning_rate=learningRate)
+         case "adagrad":
+              return tf.keras.optimizers.Adagrad(learning_rate=learningRate)
+         case "adadelta":
+              return tf.keras.optimizers.Adadelta(learning_rate=learningRate)
+         case "adam":
+              return tf.keras.optimizers.Adam(learning_rate=learningRate)
+         case "adamax":
+              return tf.keras.optimizers.Adamax(learning_rate=learningRate)
+         case "rmsprop":
+              return tf.keras.optimizers.RMSprop(learning_rate=learningRate)  
 
-def validationDS_gen():
-     validationDS = DataSet("127.0.0.1", "/jena-weather-validation", "3000", "jena-weather-validation", 1280, { "batch_size" : 128, "first": 20 })
-     validationDS.download()
-     return validationDS
-
+def lossBuilderFunction(loss):
+     match loss:
+          case "meanAbsoluteError":
+               return tf.keras.losses.MeanAbsoluteError()
+          case "meanSquaredError":
+               return tf.keras.losses.MeanSquaredError()
 
 def main():  
     global RABBITMQ_HOST, RABBITMQ_PORT, inputQueue, outputQueuePrefix
-    #  print(f"\n======================{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}======================\n")
-     
-    #  trainDS_genRes = trainDS_gen()
-    #  trainValidationDS_genRes = trainValidationDS_gen()
-    #  validationDS_genRes = validationDS_gen()
-
-    #  trainDS = tf.data.Dataset.from_generator(trainDS_gen,
-    #     output_types=(tf.float32, tf.float32),
-    #     output_shapes = (trainDS_genRes.input_shape,trainDS_genRes.output_shape))
-    #  trainValidationDS = tf.data.Dataset.from_generator(trainValidationDS_gen,
-    #     output_types=(tf.float32, tf.float32),
-    #     output_shapes = (trainValidationDS_genRes.input_shape,trainValidationDS_genRes.output_shape))  
-    #  validationDS = tf.data.Dataset.from_generator(validationDS_gen,
-    #     output_types=(tf.float32, tf.float32),
-    #     output_shapes = (validationDS_genRes.input_shape,validationDS_genRes.output_shape))   
-    #  trainModel(None, trainDS, trainDS_genRes, trainValidationDS, trainValidationDS_genRes, validationDS, validationDS_genRes)     
-    #  print(f"\n======================{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}======================\n")
-    
 
     #test only - start
     os.environ["RABBITMQ_HOST"] = "127.0.0.1"
@@ -313,6 +255,10 @@ def main():
                         "workerData": { 
                             "buildModel": buildModel,
                             "phenotype": {
+                                            "modelType": "mlp",
+                                            "add_dropout": False,
+                                            "dropoutRate": 0,
+                                            "recurrentDropout": 0,
                                             "epochs": 1,
                                             "batchSize": 128,
                                             "learningRate": 0.01,
