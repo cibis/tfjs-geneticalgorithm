@@ -27,6 +27,17 @@ module.exports = class LocalModelStorage extends ModelStorageInterface {
         await model.save(`file://${MODEL_STORAGE}${modelId}`);
     }
 
+    async writeModelBuffer(modelId, bufferData){
+        if(!modelId) throw Error("modelId is undefined");
+        if (!fs.existsSync(BEST_MODEL_STORAGE)){
+            fs.mkdirSync(BEST_MODEL_STORAGE, { recursive: true });
+        }
+        if (!fs.existsSync(`${MODEL_STORAGE}${modelId}/`)){
+            fs.mkdirSync(`${MODEL_STORAGE}${modelId}/`, { recursive: true });
+        }
+        fs.writeFileSync(`${MODEL_STORAGE}${modelId}/model.keras`, bufferData);
+    }
+
     copyToBest(phenotype, group){
         phenotype.group = group;
         fs.writeFileSync(`${BEST_MODEL_STORAGE}${phenotype._id}.json`, JSON.stringify(phenotype), 'utf8'); 

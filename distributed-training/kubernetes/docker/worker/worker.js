@@ -334,7 +334,7 @@ async function readQueue() {
         resolve(null);
       });
 
-      await channel.assertQueue(inputQueue, { durable: false });
+      await channel.assertQueue(inputQueue, { durable: true });
       await channel.prefetch(1);
 
       await channel.consume(
@@ -369,7 +369,7 @@ async function writeQueue(id, tfjsJobResponse) {
       connection = await amqp.connect(queueUrl);
       const channel = await connection.createChannel();
 
-      await channel.assertQueue(outputQueue, { durable: false });
+      await channel.assertQueue(outputQueue, { durable: true });
       channel.sendToQueue(outputQueue, Buffer.from(JSON.stringify(tfjsJobResponse)));
       await channel.close();
       resolve();

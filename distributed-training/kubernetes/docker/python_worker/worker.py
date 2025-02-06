@@ -9,6 +9,11 @@ from datetime import datetime
 from rabbitmq import RabbitMQ
 import traceback
 from utils import DictToObj
+import time
+
+
+SETTINGS = { "TEST_MODE" : False}
+
 
 CACHE_STORAGE = "./_runtime/cache/"
 MODEL_STORAGE = "shared/models/"
@@ -47,7 +52,7 @@ class DataSet:
          itemsCnt=0
          if(not os.path.isdir(self.cacheFileDir)):
               tmpFolderGuid = guidGenerator()
-              self.cacheFileDir = f"{CACHE_STORAGE}{tmpFolderGuid + "_"}{self.cache_id}/"
+              self.cacheFileDir = f"{CACHE_STORAGE}{tmpFolderGuid}_{self.cache_id}/"
               path = Path(self.cacheFileDir)
               path.mkdir(parents=True, exist_ok=True)
               batch_index = 0
@@ -80,9 +85,15 @@ class DataSet:
          self.minBatchIndex = 0
 
          if (self.options["first"]):
+              if SETTINGS["TEST_MODE"]:     
+                self.options["first"] = 0.1
+
               self.maxBatchIndex = round(self.maxBatchIndex * self.options["first"] / 100)
                 
          if (self.options["last"]):
+              if SETTINGS["TEST_MODE"]:    
+                self.options["last"] = 0.1
+              
               self.minBatchIndex = round(self.maxBatchIndex * (100 - self.options["last"]) / 100) + 1    
 
          print(f"self.minBatchIndex: {self.minBatchIndex}, self.maxBatchIndex: {self.maxBatchIndex}, itemsCnt: {itemsCnt}")    
@@ -167,44 +178,51 @@ def readQueue():
     try:
         def callback(ch, method, properties, body):
             global buildModel
-            try:
-                wguid = guidGenerator()
-                print(f"Worker {wguid} started")
-                message = json.loads(body.decode("utf-8"))
-                workerData = message["workerData"]
-                trainDS_genRes = ds_gen(workerData["tensors"]["trainingDataSetSource"], { "batch_size": workerData["phenotype"]["batchSize"], "first": (1-workerData["validationSplit"]) * 100 })
-                trainValidationDS_genRes = ds_gen(workerData["tensors"]["trainingDataSetSource"], { "batch_size": workerData["phenotype"]["batchSize"], "last": workerData["validationSplit"] * 100 })
-                validationDS_genRes = ds_gen(workerData["tensors"]["validationDataSetSource"], { "batch_size": workerData["phenotype"]["batchSize"] })
+            if body != None:
+                try:
+                    print(body)
+                    wguid = guidGenerator()
+                    print(f"Worker {wguid} started")
+                    message = json.loads(body.decode("utf-8"))
+                    workerData = message["workerData"]
+                    trainDS_genRes = ds_gen(workerData["tensors"]["trainingDataSetSource"], { "batch_size": workerData["phenotype"]["batchSize"], "first": (1-workerData["validationSplit"]) * 100 })
+                    trainValidationDS_genRes = ds_gen(workerData["tensors"]["trainingDataSetSource"], { "batch_size": workerData["phenotype"]["batchSize"], "last": workerData["validationSplit"] * 100 })
+                    validationDS_genRes = ds_gen(workerData["tensors"]["validationDataSetSource"], { "batch_size": workerData["phenotype"]["batchSize"] })
 
-                if buildModel == None:
-                     local_ns = {}
-                     exec(workerData["modelJson"]["buildModel"], None, local_ns)
-                     buildModel = local_ns["buildModel"]
-                model = buildModel(workerData, trainDS_genRes.input_shape)
-                trainDS_genRes = ds_gen(workerData["tensors"]["trainingDataSetSource"], { "batch_size": workerData["phenotype"]["batchSize"], "first": (1-workerData["validationSplit"]) * 100 })
-                trainValidationDS_genRes = ds_gen(workerData["tensors"]["trainingDataSetSource"], { "batch_size": workerData["phenotype"]["batchSize"], "last": workerData["validationSplit"] * 100 })
-                validationDS_genRes = ds_gen(workerData["tensors"]["validationDataSetSource"], { "batch_size": workerData["phenotype"]["batchSize"] })
+                    if buildModel == None:
+                        local_ns = {}
+                        exec(workerData["modelJson"]["buildModel"], None, local_ns)
+                        buildModel = local_ns["buildModel"]
+                    model = buildModel(workerData, trainDS_genRes.input_shape)
+                    trainDS_genRes = ds_gen(workerData["tensors"]["trainingDataSetSource"], { "batch_size": workerData["phenotype"]["batchSize"], "first": (1-workerData["validationSplit"]) * 100 })
+                    trainValidationDS_genRes = ds_gen(workerData["tensors"]["trainingDataSetSource"], { "batch_size": workerData["phenotype"]["batchSize"], "last": workerData["validationSplit"] * 100 })
+                    validationDS_genRes = ds_gen(workerData["tensors"]["validationDataSetSource"], { "batch_size": workerData["phenotype"]["batchSize"] })
 
-                trainDS = tf.data.Dataset.from_generator(generator=lambda:ds_gen(workerData["tensors"]["trainingDataSetSource"], { "batch_size": workerData["phenotype"]["batchSize"], "first": (1-workerData["validationSplit"]) * 100 }),
-                    output_types=(tf.float32, tf.float32),
-                    output_shapes = (trainDS_genRes.input_shape,trainDS_genRes.output_shape))
-                trainValidationDS = tf.data.Dataset.from_generator(generator=lambda:ds_gen(workerData["tensors"]["trainingDataSetSource"], { "batch_size": workerData["phenotype"]["batchSize"], "last": workerData["validationSplit"] * 100 }),
-                    output_types=(tf.float32, tf.float32),
-                    output_shapes = (trainValidationDS_genRes.input_shape,trainValidationDS_genRes.output_shape))  
-                validationDS = tf.data.Dataset.from_generator(generator=lambda:ds_gen(workerData["tensors"]["validationDataSetSource"], { "batch_size": workerData["phenotype"]["batchSize"] }),
-                    output_types=(tf.float32, tf.float32),
-                    output_shapes = (validationDS_genRes.input_shape,validationDS_genRes.output_shape))   
-                trainRes = trainModel(wguid, model, workerData, trainDS, trainDS_genRes, trainValidationDS, trainValidationDS_genRes, validationDS, validationDS_genRes)                 
-                
-                writeQueue(trainRes["phenotype"]["_id"], trainRes)
-            except Exception as callback_err:
-                print(traceback.format_exc())
-            readQueue()
+                    trainDS = tf.data.Dataset.from_generator(generator=lambda:ds_gen(workerData["tensors"]["trainingDataSetSource"], { "batch_size": workerData["phenotype"]["batchSize"], "first": (1-workerData["validationSplit"]) * 100 }),
+                        output_types=(tf.float32, tf.float32),
+                        output_shapes = (trainDS_genRes.input_shape,trainDS_genRes.output_shape))
+                    trainValidationDS = tf.data.Dataset.from_generator(generator=lambda:ds_gen(workerData["tensors"]["trainingDataSetSource"], { "batch_size": workerData["phenotype"]["batchSize"], "last": workerData["validationSplit"] * 100 }),
+                        output_types=(tf.float32, tf.float32),
+                        output_shapes = (trainValidationDS_genRes.input_shape,trainValidationDS_genRes.output_shape))  
+                    validationDS = tf.data.Dataset.from_generator(generator=lambda:ds_gen(workerData["tensors"]["validationDataSetSource"], { "batch_size": workerData["phenotype"]["batchSize"] }),
+                        output_types=(tf.float32, tf.float32),
+                        output_shapes = (validationDS_genRes.input_shape,validationDS_genRes.output_shape))   
+                    trainRes = trainModel(wguid, model, workerData, trainDS, trainDS_genRes, trainValidationDS, trainValidationDS_genRes, validationDS, validationDS_genRes)                 
+                    
+                    writeQueue(trainRes["phenotype"]["_id"], trainRes)
+                except Exception as callback_err:
+                    print(traceback.format_exc())
+            time.sleep(3)
+            #readQueue()
 
         rabbitmq = RabbitMQ(RABBITMQ_HOST, RABBITMQ_PORT)
         rabbitmq.consume(inputQueue, callback)
+        #callback(None, None, None, rabbitmq.get(inputQueue))
     except Exception as err:
         print(traceback.format_exc())
+        time.sleep(3)
+        print("trying to re-establish connection")
+        readQueue()
 
 def writeQueue(id, tfjsJobResponse):
     outputQueue = f"{outputQueuePrefix}-{id}"
@@ -233,6 +251,29 @@ def optimizerBuilderFunction(optimizer, learningRate):
          case "rmsprop":
               return tf.keras.optimizers.RMSprop(learning_rate=learningRate)  
 
+def initializers(initializer):
+    match initializer:
+        case 'leCunNormal':
+            return tf.keras.initializers.LecunNormal()
+        case 'glorotNormal':
+            return tf.keras.initializers.GlorotNormal()
+        case 'glorotUniform':
+            return tf.keras.initializers.GlorotUniform()
+        case 'heNormal':
+            return tf.keras.initializers.HeNormal()
+        case 'heUniform':
+            return tf.keras.initializers.HeUniform()
+        case 'leCunUniform':
+            return tf.keras.initializers.LecunUniform()
+        case 'randomNormal':
+            return tf.keras.initializers.RandomNormal()       
+        case 'randomUniform':
+            return tf.keras.initializers.RandomUniform()    
+        case 'truncatedNormal':
+            return tf.keras.initializers.TruncatedNormal()    
+        case 'varianceScaling':
+            return tf.keras.initializers.VarianceScaling()                                                                    
+
 def lossBuilderFunction(loss):
      match loss:
           case "meanAbsoluteError":
@@ -241,73 +282,17 @@ def lossBuilderFunction(loss):
                return tf.keras.losses.MeanSquaredError()
 
 def main():  
-    global RABBITMQ_HOST, RABBITMQ_PORT, inputQueue, outputQueuePrefix
+    global SETTINGS, RABBITMQ_HOST, RABBITMQ_PORT, inputQueue, outputQueuePrefix
+    print(f"main() -> SETTINGS: {SETTINGS}")
 
-    #test only - start
-    # os.environ["RABBITMQ_HOST"] = "127.0.0.1"
-    # os.environ["RABBITMQ_PORT"] = "30000"    
-    # os.environ["JOB_NAME"] = "tfjsjob"
-    # RABBITMQ_HOST = os.getenv('RABBITMQ_HOST', 'rabbitmq-service')
-    # RABBITMQ_PORT = int(os.getenv('RABBITMQ_PORT', 5672))
-    # with open("buildModel.py", 'r') as file:
-    #     buildModel = file.read()      
-    #     workerData =    {
-    #                     "workerData": { 
-    #                         "buildModel": buildModel,
-    #                         "phenotype": {
-    #                                         "modelType": "mlp",
-    #                                         "add_dropout": False,
-    #                                         "dropoutRate": 0,
-    #                                         "recurrentDropout": 0,
-    #                                         "epochs": 1,
-    #                                         "batchSize": 128,
-    #                                         "learningRate": 0.01,
-    #                                         "hiddenLayers": 1,
-    #                                         "hiddenLayerUnits": 32,
-    #                                         "activation": "relu",
-    #                                         "kernelInitializer": "leCunNormal",
-    #                                         "optimizer": "rmsprop",
-    #                                         "loss": "meanAbsoluteError",
-    #                                         "_id": "0cfb3118-640e-e65b-7b00-3f40d779f51e",
-    #                                         "validationLoss": 14.2844,
-    #                                         "_type": "CLONE",
-    #                                         "executionTime": "00:43:32",
-    #                                         "evolveGenerations": 5,
-    #                                         "elitesGenerations": 2,
-    #                                         "group": "boston-housing"
-    #                                     }, 
-    #                         "tensors":  {
-    #                                         "trainingDataSetSource": {
-    #                                             "host": "127.0.0.1",
-    #                                             "path": "/jena-weather-training",
-    #                                             "port": "3000",
-    #                                             "pre_cache": "jena-weather-training",
-    #                                             "cache_id": "jena-weather-training",
-    #                                             "cache_batch_size": 1280
-    #                                         },
-    #                                         "validationDataSetSource": {
-    #                                             "host": "127.0.0.1",
-    #                                             "path": "/jena-weather-validation",
-    #                                             "port": "3000",
-    #                                             "pre_cache": "jena-weather-validation",
-    #                                             "cache_id": "jena-weather-validation",
-    #                                             "cache_batch_size": 1280
-    #                                         }
-    #                                     },
-    #                         "validationSplit": 0.2, 
-    #                         "modelAbortThreshold": None,
-    #                         "modelTrainingTimeThreshold": None
-    #                     }
-    #                 }
-    # rabbitmq = RabbitMQ(RABBITMQ_HOST, RABBITMQ_PORT)
-    # rabbitmq.publish("tfjsjob-INPUT", json.dumps(workerData))
-    # rabbitmq.close() 
-    #test only - end
-
-    RABBITMQ_HOST = os.getenv('RABBITMQ_HOST', 'rabbitmq-service')
-    RABBITMQ_PORT = int(os.getenv('RABBITMQ_PORT', 5672))
+    if SETTINGS["TEST_MODE"]:
+        RABBITMQ_HOST = os.getenv('RABBITMQ_HOST', '127.0.0.1')
+        RABBITMQ_PORT = int(os.getenv('RABBITMQ_PORT', 30000))        
+    else:
+        RABBITMQ_HOST = os.getenv('RABBITMQ_HOST', 'rabbitmq-service')
+        RABBITMQ_PORT = int(os.getenv('RABBITMQ_PORT', 5672))
     inputQueue = os.environ["JOB_NAME"] + "-INPUT"
     outputQueuePrefix = os.environ["JOB_NAME"] + "-OUTPUT"
-    readQueue() 
-          
-main()
+    print(f"inputQueue: {inputQueue}")
+    print(f"outputQueuePrefix: {outputQueuePrefix}")
+    readQueue()

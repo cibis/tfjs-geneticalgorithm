@@ -1,7 +1,16 @@
+/*
+run this:
+tfjs-geneticalgorithm\distributed-training\kubernetes\docker\python_worker> python worker-local-test.py
+
+before running:
+tfjs-geneticalgorithm> node examples\jena-weather\python-worker-local-test.js
+*/
+
+
 const tf = require('@tensorflow/tfjs-node');
 const fs = require('fs')
 const JenaWeather = require('./jena-weather')
-var WorkerTraining = require("../../distributed-training/kubernetes/worker_starter");
+var WorkerTraining = require("../../distributed-training/kubernetes/worker_local_starter");
 var TFJSGeneticAlgorithmConstructor = require("../../index")
 var ModelStorage = require("../../model-storage/current")
 var ExampleDataService = require('../example-data-service');
@@ -26,7 +35,7 @@ async function testPredefinedModelsAgainstGA() {
     await ExampleDataService.load();
 
     var taskSettings = {
-        parallelism: 5,
+        parallelism: 1,
         //calculate in advance based on first epoch time
         modelTrainingTimeThreshold: (60 * 60 * 2)/* 2 h */,
         populationSize: 30,
@@ -37,7 +46,6 @@ async function testPredefinedModelsAgainstGA() {
     };
 
     var worker = new WorkerTraining(`job-tfjs-node-${utils.guidGenerator()}`, taskSettings.parallelism, taskSettings.modelTrainingTimeThreshold * 3, "python");
-    await worker.startJob();
     try {
         var ga = TFJSGeneticAlgorithmConstructor({
             parallelProcessing: true,
@@ -62,8 +70,8 @@ async function testPredefinedModelsAgainstGA() {
             populationSize: taskSettings.populationSize,
             baseline: taskSettings.baseline,
             tensors: new DataService.DataSetSources(
-                new DataService.DataSetSource("host.minikube.internal", "/jena-weather-training", "3000", "jena-weather-training", 1280),
-                new DataService.DataSetSource("host.minikube.internal", "/jena-weather-validation", "3000", "jena-weather-validation", 1280)
+                new DataService.DataSetSource("127.0.0.1", "/jena-weather-training", "3000", "jena-weather-training", 1280),
+                new DataService.DataSetSource("127.0.0.1", "/jena-weather-validation", "3000", "jena-weather-validation", 1280)
             ),
             //tensors: BostonHousing.getTensor(),
             parameterMutationFunction: (oldPhenotype) => {
@@ -150,7 +158,6 @@ async function testPredefinedModelsAgainstGA() {
     }
     finally {
         console.log(`${Date.now()} worker.stopJob`)
-        await worker.stopJob();
     }
     process.exit(0);
 }

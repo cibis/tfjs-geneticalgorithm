@@ -32,6 +32,7 @@ class RabbitMQ:
         self.channel.basic_qos(prefetch_count=1)
         self.channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=True)
         self.channel.start_consuming()
+        
 
     def publish(self, queue_name, message):
         if not self.channel:
