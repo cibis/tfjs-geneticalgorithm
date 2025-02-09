@@ -26,7 +26,7 @@ async function testPredefinedModelsAgainstGA() {
     await ExampleDataService.load();
 
     var taskSettings = {
-        parallelism: 5,
+        parallelism: 2,
         //calculate in advance based on first epoch time
         modelTrainingTimeThreshold: (60 * 60 * 2)/* 2 h */,
         populationSize: 30,
@@ -69,7 +69,7 @@ async function testPredefinedModelsAgainstGA() {
             parameterMutationFunction: (oldPhenotype) => {
                 if (!oldPhenotype) {
                     return {
-                        epochs: 1,
+                        epochs: 20,
                         batchSize: 128,
                         learningRate: 0.01,
                         hiddenLayers: 1,
@@ -135,7 +135,7 @@ async function testPredefinedModelsAgainstGA() {
         bestModel = await ga.cloneCompete(bestModel, taskSettings.finalCloneCompetitionSize);
         console.log(`Best of all GA model after cloneCompete`)
         console.log(bestModel);
-        //ModelStorage.copyToBest(bestModel, "jena-weather");
+        ModelStorage.copyToBest(bestModel, "jena-weather");
         console.log(`Best predefined models loss ${bestPredefinedModelLoss}`)
         console.log(`Best GA models loss after cloneCompete ${bestModel.validationLoss}`)
         if (bestPredefinedModelLoss > bestModel.validationLoss) {

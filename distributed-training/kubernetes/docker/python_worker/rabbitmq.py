@@ -30,7 +30,7 @@ class RabbitMQ:
         if not self.channel:
             raise Exception("Connection is not established.")
         self.channel.basic_qos(prefetch_count=1)
-        self.channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=True)
+        self.channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=False)
         self.channel.start_consuming()
         
 

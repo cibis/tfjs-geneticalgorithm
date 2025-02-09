@@ -3,3 +3,4 @@ node_modules
 npm-debug.log
 models
 cache
+distributed-training/kubernetes/docker/python_worker/__pycache__/*.pyc

@@ -38,11 +38,11 @@ async function testPredefinedModelsAgainstGA() {
         parallelism: 1,
         //calculate in advance based on first epoch time
         modelTrainingTimeThreshold: (60 * 60 * 2)/* 2 h */,
-        populationSize: 30,
+        populationSize: 2,
         baseline: 24,
-        evolveGenerations: 5,
-        elitesGenerations: 2,
-        finalCloneCompetitionSize: 10,
+        evolveGenerations: 1,
+        elitesGenerations: 1,
+        finalCloneCompetitionSize: 1,
     };
 
     var worker = new WorkerTraining(`job-tfjs-node-${utils.guidGenerator()}`, taskSettings.parallelism, taskSettings.modelTrainingTimeThreshold * 3, "python");
@@ -143,7 +143,7 @@ async function testPredefinedModelsAgainstGA() {
         bestModel = await ga.cloneCompete(bestModel, taskSettings.finalCloneCompetitionSize);
         console.log(`Best of all GA model after cloneCompete`)
         console.log(bestModel);
-        //ModelStorage.copyToBest(bestModel, "jena-weather");
+        ModelStorage.copyToBest(bestModel, "jena-weather");
         console.log(`Best predefined models loss ${bestPredefinedModelLoss}`)
         console.log(`Best GA models loss after cloneCompete ${bestModel.validationLoss}`)
         if (bestPredefinedModelLoss > bestModel.validationLoss) {

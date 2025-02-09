@@ -46,9 +46,8 @@ async function readQueue(inputQueue, waitTimeThreshold) {
                     if (waitTimeThreshold && timeoutInterval) {
                         clearInterval(timeoutInterval);
                     }
-                    console.log(`message : ${message}`)
                     if (message) {
-                        resolve(JSON.parse((message.content ?? message).toString()));
+                        resolve(JSON.parse((message.content).toString()));
                     }
                     else{
                         resolve(null);
@@ -183,12 +182,6 @@ module.exports = class WorkerTraining extends DistributedTrainingInterface {
                         workerData: { 
                             phenotype: phenotype, 
                             modelJson : modelJson, 
-                            // tensors: JSON.stringify({ 
-                            //     trainFeatures: tensors.trainFeatures.arraySync(), 
-                            //     trainTarget: tensors.trainTarget.arraySync(), 
-                            //     testFeatures: tensors.testFeatures.arraySync(), 
-                            //     testTarget: tensors.testTarget.arraySync()
-                            // }), 
                             tensors: tensors,
                             validationSplit: validationSplit, 
                             modelAbortThreshold: modelAbortThreshold,
@@ -196,20 +189,28 @@ module.exports = class WorkerTraining extends DistributedTrainingInterface {
                         },
                     });
                     var tfjsJob = (await readQueue(`${self.outputQueuePrefix}-${phenotype._id}`, self.podResponseTimeThreshold * 1000));
-                    console.log("GOT MESSAGE!");
-                    console.log(JSON.stringify(tfjsJob));
-                    // throw Error()
                     if (tfjsJob && tfjsJob.modelJson) {
-                        const modelData = JSON.parse(tfjsJob.modelJson);
-                        const weightData = new Uint8Array(Buffer.from(modelData.weightData, "base64")).buffer;
-                        const model = await tf.loadLayersModel(tf.io.fromMemory(
-                            { 
-                                modelTopology: modelData.modelTopology, 
-                                weightSpecs: modelData.weightSpecs, 
-                                weightData: weightData 
+                        switch (self.alternativeWorker) {
+                            case "python":
+                                {
+                                    ModelStorage.writeModelBuffer(phenotype._id, Buffer.from(tfjsJob.modelJson, "hex"));
+                                }
+                                break;
+                            default:
+                                {
+                                    const modelData = JSON.parse(tfjsJob.modelJson);
+                                    const weightData = new Uint8Array(Buffer.from(modelData.weightData, "base64")).buffer;
+                                    const model = await tf.loadLayersModel(tf.io.fromMemory(
+                                        {
+                                            modelTopology: modelData.modelTopology,
+                                            weightSpecs: modelData.weightSpecs,
+                                            weightData: weightData
 
-                            }));
-                        ModelStorage.writeModel(phenotype._id, model);
+                                        }));
+                                    ModelStorage.writeModel(phenotype._id, model);
+                                }
+                                break;
+                        }
                         resolve({ validationLoss: tfjsJob.validationLoss, phenotype: tfjsJob.phenotype });
                     } else {
                         resolve({ validationLoss: NaN, phenotype: phenotype });

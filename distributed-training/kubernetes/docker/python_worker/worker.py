@@ -180,7 +180,7 @@ def readQueue():
             global buildModel
             if body != None:
                 try:
-                    print(body)
+                    rabbitmq.channel.basic_ack(delivery_tag = method.delivery_tag)
                     wguid = guidGenerator()
                     print(f"Worker {wguid} started")
                     message = json.loads(body.decode("utf-8"))

@@ -113,6 +113,9 @@ node examples\jena-weather\run-basic.js
 node examples\jena-weather\run-workers.js
 ```
 
+# Feb 09 2025
+- Jena Weather Example, Kubernetes only - added support for tensorflow python workers
+
 ```
 cd distributed-training\kubernetes\docker\python_worker
 docker build -t tfjs-ks-python-worker .
@@ -120,6 +123,3 @@ minikube image load tfjs-ks-python-worker:latest
 
 node examples\jena-weather\run-kubernetes.js
 ```
-
-# Coming-Next
-- Kubernetes only - support for tensorflow python workers
