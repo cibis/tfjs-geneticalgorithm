@@ -42,12 +42,18 @@ async function readQueue(inputQueue, waitTimeThreshold) {
             await channel.consume(
                 inputQueue,
                 async (message) => {
-                    console.log(message)
                     if (waitTimeThreshold && timeoutInterval) {
                         clearInterval(timeoutInterval);
                     }
                     if (message) {
-                        resolve(JSON.parse((message.content).toString()));
+                        var jsonParse = null;
+                        try {
+                            jsonParse = JSON.parse((message.content).toString());
+                        }
+                        catch (parseErr) {
+                            console.log(`worker response parse error: err: ${parseErr}`)
+                        }
+                        resolve(jsonParse);
                     }
                     else{
                         resolve(null);

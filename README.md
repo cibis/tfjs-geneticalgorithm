@@ -119,6 +119,7 @@ node examples\jena-weather\run-workers.js
 ```
 cd distributed-training\kubernetes\docker\python_worker
 docker build -t tfjs-ks-python-worker .
+
 minikube image load tfjs-ks-python-worker:latest
 
 node examples\jena-weather\run-kubernetes.js

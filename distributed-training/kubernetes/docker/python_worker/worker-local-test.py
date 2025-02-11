@@ -12,7 +12,7 @@ from utils import DictToObj
 from worker import main
 from worker import SETTINGS
 
-SETTINGS["TEST_MODE"] = True
+#SETTINGS["TEST_MODE"] = True
 os.environ["RABBITMQ_HOST"] = "127.0.0.1"
 os.environ["RABBITMQ_PORT"] = "30000"    
 os.environ["JOB_NAME"] = "tfjsjob"

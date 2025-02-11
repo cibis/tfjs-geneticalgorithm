@@ -10,6 +10,7 @@ from rabbitmq import RabbitMQ
 import traceback
 from utils import DictToObj
 import time
+from keras.src import callbacks
 
 
 SETTINGS = { "TEST_MODE" : False}
@@ -82,19 +83,23 @@ class DataSet:
                 
          self.maxBatchIndex = math.floor(itemsCnt / self.options["batch_size"]) - 1
 
-         self.minBatchIndex = 0
+         self.minBatchIndex = 0       
 
          if (self.options["first"]):
               if SETTINGS["TEST_MODE"]:     
-                self.options["first"] = 0.1
+                self.options["first"] = 5
 
               self.maxBatchIndex = round(self.maxBatchIndex * self.options["first"] / 100)
                 
          if (self.options["last"]):
               if SETTINGS["TEST_MODE"]:    
-                self.options["last"] = 0.1
+                self.options["last"] = 5
               
-              self.minBatchIndex = round(self.maxBatchIndex * (100 - self.options["last"]) / 100) + 1    
+              self.minBatchIndex = round(self.maxBatchIndex * (100 - self.options["last"]) / 100) + 1  
+
+         if not self.options["first"] and not self.options["last"] and SETTINGS["TEST_MODE"]:
+             self.options["last"] = 1     
+             self.minBatchIndex = round(self.maxBatchIndex * (100 - self.options["last"]) / 100) + 1      
 
          print(f"self.minBatchIndex: {self.minBatchIndex}, self.maxBatchIndex: {self.maxBatchIndex}, itemsCnt: {itemsCnt}")    
 
@@ -154,13 +159,17 @@ class DataSet:
 def trainModel(wguid, model, workerdata, trainDS, trainDS_genRes, trainValidationDS, trainValidationDS_genRes, validationDS, validationDS_genRes, patience=2):
     early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
                                                         patience=patience,
-                                                        mode='min')  
-    history = model.fit(trainDS, epochs=workerdata["phenotype"]["epochs"], steps_per_epoch = trainDS_genRes.maxBatchIndex - trainDS_genRes.minBatchIndex, validation_steps = trainValidationDS_genRes.maxBatchIndex - trainValidationDS_genRes.minBatchIndex,
+                                                        mode='min',
+                                                        restore_best_weights=True)  
+    history = model.fit(trainDS, epochs=workerdata["phenotype"]["epochs"], steps_per_epoch = trainDS_genRes.maxBatchIndex - trainDS_genRes.minBatchIndex + 1, validation_steps = trainValidationDS_genRes.maxBatchIndex - trainValidationDS_genRes.minBatchIndex + 1,
                         validation_data=trainValidationDS,
-                        callbacks=[early_stopping])  
+                        callbacks=[early_stopping, callbacks.TerminateOnNaN()])  
     
     val_performance = model.evaluate(validationDS, return_dict=True)
     loss = val_performance["loss"]
+    if min(early_stopping.best_epoch, early_stopping.stopped_epoch) > 0:        
+        print(f'adjusted epoch: original: {workerdata["phenotype"]["epochs"]}, new: {min(early_stopping.best_epoch, early_stopping.stopped_epoch)}')
+        workerdata["phenotype"]["epochs"] = min(early_stopping.best_epoch, early_stopping.stopped_epoch)
     workerdata["phenotype"]["validationLoss"] = loss
     keras_model_path = f'{CACHE_STORAGE}{wguid}.keras'
     model.save(keras_model_path)
@@ -180,7 +189,9 @@ def readQueue():
             global buildModel
             if body != None:
                 try:
+                    print(body)
                     rabbitmq.channel.basic_ack(delivery_tag = method.delivery_tag)
+                    rabbitmq.close()
                     wguid = guidGenerator()
                     print(f"Worker {wguid} started")
                     message = json.loads(body.decode("utf-8"))
@@ -213,7 +224,7 @@ def readQueue():
                 except Exception as callback_err:
                     print(traceback.format_exc())
             time.sleep(3)
-            #readQueue()
+            readQueue()
 
         rabbitmq = RabbitMQ(RABBITMQ_HOST, RABBITMQ_PORT)
         rabbitmq.consume(inputQueue, callback)
@@ -221,6 +232,10 @@ def readQueue():
     except Exception as err:
         print(traceback.format_exc())
         time.sleep(3)
+        try:
+            rabbitmq.close()
+        except:
+            None
         print("trying to re-establish connection")
         readQueue()
 

@@ -26,9 +26,9 @@ async function testPredefinedModelsAgainstGA() {
     await ExampleDataService.load();
 
     var taskSettings = {
-        parallelism: 2,
+        parallelism: 5,
         //calculate in advance based on first epoch time
-        modelTrainingTimeThreshold: (60 * 60 * 2)/* 2 h */,
+        modelTrainingTimeThreshold: (60 * 60 * 1)/* 1 h */,
         populationSize: 30,
         baseline: 24,
         evolveGenerations: 5,
@@ -36,7 +36,7 @@ async function testPredefinedModelsAgainstGA() {
         finalCloneCompetitionSize: 10,
     };
 
-    var worker = new WorkerTraining(`job-tfjs-node-${utils.guidGenerator()}`, taskSettings.parallelism, taskSettings.modelTrainingTimeThreshold * 3, "python");
+    var worker = new WorkerTraining(`job-tfjs-node-${utils.guidGenerator()}`, taskSettings.parallelism, taskSettings.modelTrainingTimeThreshold, "python");
     await worker.startJob();
     try {
         var ga = TFJSGeneticAlgorithmConstructor({
@@ -51,7 +51,10 @@ async function testPredefinedModelsAgainstGA() {
 
                     var workerResponse = await worker.trainModel(phenotype, modelJson, this.tensors, this.validationSplit, this.modelAbortThreshold, this.modelTrainingTimeThreshold);
                     phenotype.epochs = workerResponse.phenotype.epochs;
-                    console.log(`Model training completed ${phenotype._id} . loss ${workerResponse.validationLoss}`);
+                    
+                    console.log(`\nModel training completed ${phenotype._id} . loss ${workerResponse.validationLoss}`);
+                    console.log(JSON.stringify(phenotype));
+
                     return { validationLoss: parseFloat(workerResponse.validationLoss) }
                 }
                 catch (err) {
