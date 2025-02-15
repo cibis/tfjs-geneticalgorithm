@@ -92,11 +92,11 @@ async function writeQueue(outputQueue, tfjsJobResponse) {
 }
 
 const deleteJob = async (jobName) => {
-    await k8sBatchApi.deleteNamespacedJob(jobName, 'default', propagationPolicy = 'Background');
+    await k8sBatchApi.deleteNamespacedJob( name = jobName, namespace = 'default', propagationPolicy = 'Foreground');
     (await k8sApi.listNamespacedPod('default')).body.items.forEach(async pod => {
         if (pod.metadata.labels["job-name"] == jobName) {
             console.log(`deleting pod ${pod.metadata.name}`);
-            k8sApi.deleteNamespacedPod(pod.metadata.name, 'default');
+            k8sApi.deleteNamespacedPod( name = pod.metadata.name, namespace = 'default', gracePeriodSeconds = 0 );
         }
     })
 }
