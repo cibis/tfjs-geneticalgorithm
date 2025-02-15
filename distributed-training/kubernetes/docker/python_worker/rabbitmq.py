@@ -16,7 +16,7 @@ class RabbitMQ:
 
     def connect(self):
         #credentials = pika.PlainCredentials(self.user, self.password)
-        parameters = pika.ConnectionParameters(host=self.host, port=self.port 
+        parameters = pika.ConnectionParameters(host=self.host, port=self.port, heartbeat=0, 
                                                #,credentials=credentials
                                                )
         self.connection = pika.BlockingConnection(parameters)

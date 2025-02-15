@@ -28,9 +28,8 @@ async function testPredefinedModelsAgainstGA() {
     var taskSettings = {
         parallelism: 5,
         //calculate in advance based on first epoch time
-        modelTrainingTimeThreshold: (60 * 60 * 1)/* 1 h */,
+        modelTrainingTimeThreshold: (60 * 60 * 2)/* 2 h */,
         populationSize: 30,
-        baseline: 24,
         evolveGenerations: 5,
         elitesGenerations: 2,
         finalCloneCompetitionSize: 10,

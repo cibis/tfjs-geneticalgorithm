@@ -47,28 +47,18 @@ module.exports = function geneticAlgorithmConstructor(options) {
 
     async function populate() {
         var size = settings.population.length
-        //console.log(`populating. current population ${settings.population.length} target size ${settings.populationSize}`)
-
-        var addNewPhenotype = async () => {
-            var newItem = await mutate(
-                settings.population.length ?
-                    cloneJSON(settings.population[Math.floor(Math.random() * size)]) :
-                    null
-            );
-            newItem._type = 'MUTATION';
-            newItem._id = utils.guidGenerator();
-
-            settings.population.push(
-                newItem
-            )
+        var getPhenotypeToClone = () => {
+            if(!settings.population.length){
+                return settings.parameterMutationFunction();
+            }
+            return settings.population[Math.floor(Math.random() * size)];
         }
 
         if (settings.parallelProcessing) {
             var requiredPopulation = settings.populationSize - settings.population.length;
             var promises = [];
-            await addNewPhenotype();
             for (var i = 0; i < requiredPopulation; i++) {
-                promises.push(mutate(cloneJSON(settings.population[Math.floor(Math.random() * size)])));
+                promises.push(mutate(cloneJSON(getPhenotypeToClone())));
                 if (settings.parallelism && settings.parallelism > 0 && (promises.length == settings.parallelism || (promises.length > 0 && i == requiredPopulation - 1))) {
                     var responses = await Promise.all(promises);
                     responses.forEach(newItem => {

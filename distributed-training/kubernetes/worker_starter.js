@@ -21,7 +21,7 @@ async function readQueue(inputQueue, waitTimeThreshold) {
     return new Promise(async function (resolve, reject) {
         try {
             //console.log(`${Date.now()} readQueue ${inputQueue}`);
-            const connection = await amqp.connect(queueUrl);
+            const connection = await amqp.connect(queueUrl, "heartbeat=0");
             const channel = await connection.createChannel();
 
             process.once("SIGINT", async () => {
@@ -95,7 +95,8 @@ const deleteJob = async (jobName) => {
     await k8sBatchApi.deleteNamespacedJob(jobName, 'default', propagationPolicy = 'Background');
     (await k8sApi.listNamespacedPod('default')).body.items.forEach(async pod => {
         if (pod.metadata.labels["job-name"] == jobName) {
-            await k8sApi.deleteNamespacedPod(pod.metadata.name, 'default');
+            console.log(`deleting pod ${pod.metadata.name}`);
+            k8sApi.deleteNamespacedPod(pod.metadata.name, 'default');
         }
     })
 }
@@ -199,7 +200,7 @@ module.exports = class WorkerTraining extends DistributedTrainingInterface {
                         switch (self.alternativeWorker) {
                             case "python":
                                 {
-                                    ModelStorage.writeModelBuffer(phenotype._id, Buffer.from(tfjsJob.modelJson, "hex"));
+                                    ModelStorage.writeModelBuffer(phenotype._id, Buffer.from(tfjsJob.modelJson, "hex"), tfjsJob.phenotype);
                                 }
                                 break;
                             default:
