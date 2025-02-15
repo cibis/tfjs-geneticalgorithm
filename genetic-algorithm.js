@@ -47,6 +47,20 @@ module.exports = function geneticAlgorithmConstructor(options) {
 
     async function populate() {
         var size = settings.population.length
+        var addNewPhenotype = async () => {
+            var newItem = await mutate(
+                settings.population.length ?
+                    cloneJSON(settings.population[Math.floor(Math.random() * size)]) :
+                    null
+            );
+            newItem._type = 'MUTATION';
+            newItem._id = utils.guidGenerator();
+
+            settings.population.push(
+                newItem
+            )
+        }
+
         var getPhenotypeToClone = () => {
             if(!settings.population.length){
                 return settings.parameterMutationFunction();
