@@ -66,7 +66,7 @@ class DataSet {
                     var options = {
                         host: this.host,
                         port: this.port,
-                        path: `${this.path}?index=${batch_index}&cache_batch_size=${this.cache_batch_size}`,
+                        path: `${this.path}${this.path.indexOf("?") != -1 ? "&" : "?"}index=${batch_index}&cache_batch_size=${this.cache_batch_size}`,
                         method: 'GET'
                     };
                     return new Promise(function (resolve, reject) {
@@ -164,7 +164,7 @@ class DataSet {
                     var options = {
                         host: this.host,
                         port: this.port,
-                        path: `${this.path}?index=${this.index}&first=${this.options.first}&last=${this.options.last}&batch_size=${this.options.batch_size}`,
+                        path: `${this.path}${this.path.indexOf("?") != -1 ? "&" : "?"}index=${this.index}&first=${this.options.first}&last=${this.options.last}&batch_size=${this.options.batch_size}`,
                         method: 'GET'
                     };
                     var asyncRequest = () => {

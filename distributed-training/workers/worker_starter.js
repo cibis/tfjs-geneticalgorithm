@@ -3,17 +3,18 @@ const { Worker, isMainThread, parentPort } = require('worker_threads');
 var DistributedTrainingInterface = require("../DistributedTrainingInterface");
 
 module.exports = class WorkerTraining extends DistributedTrainingInterface {
-    constructor() {
+    constructor(workerPath) {
         super();
-
+        this.workerPath = workerPath;
     }
 
     trainModel(phenotype/*, modelJson*/, tensors, validationSplit, modelAbortThreshold, modelTrainingTimeThreshold) {
+        var self = this;
         return new Promise((resolve, reject) => {
             var runTask = async function (resolve, reject) {
                 try {
 
-                    const worker = new Worker("./distributed-training/workers/worker.js", {
+                    const worker = new Worker(self.workerPath ? self.workerPath : "./distributed-training/workers/worker.js", {
                         workerData: { 
                             phenotype: phenotype, 
                             //modelJson : modelJson, 
