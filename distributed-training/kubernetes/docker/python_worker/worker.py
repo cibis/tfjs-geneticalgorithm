@@ -57,7 +57,8 @@ class DataSet:
               path = Path(self.cacheFileDir)
               path.mkdir(parents=True, exist_ok=True)
               batch_index = 0
-              source_path = f"{self.path}?index={batch_index}&cache_batch_size={self.cache_batch_size}"
+              separator= "?" if self.path.find('?')==-1 else "&"
+              source_path = f"{self.path}{separator}index={batch_index}&cache_batch_size={self.cache_batch_size}"
               itemsCnt = 0
               res = { "done": False }
               while(not res["done"]):
@@ -67,7 +68,8 @@ class DataSet:
                         f.write(res["value"])
                    itemsCnt += len(json.loads(res["value"])["xs"])
                    batch_index=batch_index+1
-                   source_path = f"{self.path}?index={batch_index}&cache_batch_size={self.cache_batch_size}"
+                   separator= "?" if self.path.find('?')==-1 else "&"
+                   source_path = f"{self.path}{separator}index={batch_index}&cache_batch_size={self.cache_batch_size}"
                    if res["done"]:
                         with open(f"{self.cacheFileDir}0.json", "r+") as f:
                             firstBatch = json.loads(f.read())
