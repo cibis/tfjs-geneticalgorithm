@@ -214,7 +214,7 @@ module.exports = class WorkerTraining extends DistributedTrainingInterface {
                                             weightData: weightData
 
                                         }));
-                                    ModelStorage.writeModel(phenotype._id, model);
+                                    ModelStorage.writeModel(phenotype._id, model, tfjsJob.phenotype);
                                 }
                                 break;
                         }

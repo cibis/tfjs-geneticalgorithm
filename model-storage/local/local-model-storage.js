@@ -15,7 +15,7 @@ module.exports = class LocalModelStorage extends ModelStorageInterface {
         return model;
     }
 
-    async writeModel(modelId, model){
+    async writeModel(modelId, model, phenotype){
         if(!modelId) throw Error("modelId is undefined");
         if (!fs.existsSync(BEST_MODEL_STORAGE)){
             fs.mkdirSync(BEST_MODEL_STORAGE, { recursive: true });
@@ -25,7 +25,14 @@ module.exports = class LocalModelStorage extends ModelStorageInterface {
         }
         //console.log(`${Date.now()} LocalModelStorage writeModel ${modelId} ${!!model}`);
         await model.save(`file://${MODEL_STORAGE}${modelId}`);
+        if (phenotype)
+            fs.writeFileSync(`${MODEL_STORAGE}${modelId}/phenotype.json`, JSON.stringify(phenotype), 'utf8')
     }
+
+    async writePhenotype(modelId, phenotype){
+        if(!modelId) throw Error("modelId is undefined");
+        fs.writeFileSync(`${MODEL_STORAGE}${modelId}/phenotype.json`, JSON.stringify(phenotype), 'utf8')
+    }    
 
     async writeModelBuffer(modelId, bufferData, phenotype){
         if(!modelId) throw Error("modelId is undefined");

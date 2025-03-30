@@ -187,7 +187,7 @@ module.exports = function TFJSGeneticAlgorithmConstructor(options) {
                     // savedModel.weightData = Buffer.from(savedModel.weightData).toString("base64");
                     // const modelJson = JSON.stringify(savedModel);
                     phenotype.validationLoss = testLoss;
-                    await ModelStorage.writeModel(phenotype._id, model);
+                    await ModelStorage.writeModel(phenotype._id, model, phenotype);
                     console.log(`Model training completed ${phenotype._id} . post training eval loss ${testLoss}, training validation-set loss: ${valLoss}, train-set loss: ${trainLoss}`);
                     return { validationLoss: testLoss }
                 }
