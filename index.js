@@ -345,24 +345,28 @@ module.exports = function TFJSGeneticAlgorithmConstructor(options) {
                 console.log(asciichart.plot(plotData));
             }
             if (elitesGenerations) {
-                _mutationLevel = 0.5;
-                var evolveGenerationBest = cloneJSON(generationBest);                
-                generationBest = [];
-                for (var i = 0; i < elitesGenerations; i++) {
-                    ga.updatePopulation(evolveGenerationBest);
-                    console.log(`Finals generation ${i + 1} `)
-                    console.log("============================================================\n");
-                    await ga.evolve();
-                    if(ga.failedPopulation()){
-                        console.log(`Evolve generation ${i + 1} FAILED `)
-                        continue;
+                if (generationBest.length > 1) {
+                    _mutationLevel = 0.5;
+                    var evolveGenerationBest = cloneJSON(generationBest);
+                    for (var i = 0; i < elitesGenerations; i++) {
+                        ga.updatePopulation(evolveGenerationBest);
+                        console.log(`Finals generation ${i + 1} `)
+                        console.log("============================================================\n");
+                        await ga.evolve();
+                        if (ga.failedPopulation()) {
+                            console.log(`Evolve generation ${i + 1} FAILED `)
+                            continue;
+                        }
+                        console.log(`Best in finals generation ${i + 1} loss: ${ga.best().validationLoss}`)
+                        plotData.push(parseFloat(ga.best().validationLoss));
+                        console.log(ga.best());
+                        generationBest.push(ga.best());
+                        console.log("loss change over generaions");
+                        console.log(asciichart.plot(plotData));
                     }
-                    console.log(`Best in finals generation ${i + 1} loss: ${ga.best().validationLoss}`)
-                    plotData.push(parseFloat(ga.best().validationLoss));
-                    console.log(ga.best());
-                    generationBest.push(ga.best());
-                    console.log("loss change over generaions");
-                    console.log(asciichart.plot(plotData));
+                }
+                else {
+                    console.log("Skipping finals because generationBest length < 2");
                 }
             } 
 
@@ -396,6 +400,7 @@ module.exports = function TFJSGeneticAlgorithmConstructor(options) {
         },
 
         mutateNumber: function (n, stripDecimals, maximumPercentageChange, alwaysBiggerThanZero, permittedMinimum, permittedMaximum, callStackSize) {
+            n = parseFloat(n);
             if (Math.random() > _mutationLevel) return n;
             if (callStackSize && callStackSize > 100) return n;
             var res = n;

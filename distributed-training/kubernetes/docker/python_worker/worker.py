@@ -158,7 +158,7 @@ class DataSet:
           return batch["xs"],batch["ys"]
 
 
-def trainModel(wguid, model, workerdata, trainDS, trainDS_genRes, trainValidationDS, trainValidationDS_genRes, validationDS, validationDS_genRes, patience=0):
+def trainModel(wguid, model, workerdata, trainDS, trainDS_genRes, trainValidationDS, trainValidationDS_genRes, validationDS, validationDS_genRes, patience=5):
     early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
                                                         patience=patience,
                                                         mode='min',

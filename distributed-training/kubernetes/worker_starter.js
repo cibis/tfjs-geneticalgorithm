@@ -25,8 +25,11 @@ async function readQueue(inputQueue, waitTimeThreshold) {
             const channel = await connection.createChannel();
 
             process.once("SIGINT", async () => {
-                await channel.close();
-                await connection.close();
+                try {
+                    await channel.close();
+                    await connection.close();
+                }
+                catch (closeErr) { }
                 resolve(null);
             });
             //console.log(`RESULT QUEUE ${inputQueue}`)
@@ -34,8 +37,11 @@ async function readQueue(inputQueue, waitTimeThreshold) {
             await channel.prefetch(1);
             if (waitTimeThreshold) {
                 var timeoutInterval = setTimeout(async () => {
-                    await channel.close();
-                    await connection.close();
+                    try {
+                        await channel.close();
+                        await connection.close();
+                    }
+                    catch (closeErr) { }
                     resolve(null);
                 }, waitTimeThreshold);
             }
@@ -59,8 +65,11 @@ async function readQueue(inputQueue, waitTimeThreshold) {
                         resolve(null);
                     }
                     await channel.ack(message);
-                    await channel.close();
-                    await connection.close();
+                    try {
+                        await channel.close();
+                        await connection.close();
+                    }
+                    catch (closeErr) { }
                 }
             );
 
@@ -80,13 +89,15 @@ async function writeQueue(outputQueue, tfjsJobResponse) {
 
             await channel.assertQueue(outputQueue, { durable: true });
             channel.sendToQueue(outputQueue, Buffer.from(JSON.stringify(tfjsJobResponse)));
-            await channel.close();
+            try {
+                await channel.close();
+                await connection.close();
+            }
+            catch (closeErr) { }
             resolve();
         } catch (err) {
             console.warn(err);
             reject(err);
-        } finally {
-            if (connection) await connection.close();
         }
     });
 }
@@ -184,7 +195,7 @@ module.exports = class WorkerTraining extends DistributedTrainingInterface {
         return new Promise((resolve, reject) => {
             var runTask = async function (resolve, reject) {
                 try {
-                    
+                    console.log(`send to worker: ${JSON.stringify(phenotype)}\n`);
                     await writeQueue(self.inputQueue, {
                         workerData: { 
                             phenotype: phenotype, 
