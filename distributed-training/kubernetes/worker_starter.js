@@ -6,7 +6,12 @@ var ModelStorage = require("../../model-storage/current")
 const NEW_MESSAGE_WAIT_TIME = 20000;
 
 //kubectl port-forward service/rabbitmq-service 30000:5672
-const queueUrl = "amqp://127.0.0.1:30000";
+const rabbitmqDefaultConnectionSettings = {
+    hostname: 'localhost',
+    port: 30000,
+    username: 'guest',
+    password: 'guest',
+};
 
 const kc = new k8s.KubeConfig();
 kc.loadFromDefault();
@@ -17,11 +22,17 @@ const k8sBatchApi = kc.makeApiClient(k8s.BatchV1Api);
 var DistributedTrainingInterface = require("../DistributedTrainingInterface");
 var utils = require("../../utils")
 
-async function readQueue(inputQueue, waitTimeThreshold) {
+async function readQueue(inputQueue, waitTimeThreshold, rabbitmqConnectionSettings) {
     return new Promise(async function (resolve, reject) {
         try {
             //console.log(`${Date.now()} readQueue ${inputQueue}`);
-            const connection = await amqp.connect(queueUrl, "heartbeat=0");
+            const connection = await amqp.connect(Object.assign({
+                protocol: 'amqp',
+                locale: 'en_US',
+                frameMax: 0,
+                heartbeat: 0,
+                vhost: '/',
+              }, rabbitmqConnectionSettings ?? rabbitmqDefaultConnectionSettings));
             const channel = await connection.createChannel();
 
             process.once("SIGINT", async () => {
@@ -80,11 +91,17 @@ async function readQueue(inputQueue, waitTimeThreshold) {
 }
 
 
-async function writeQueue(outputQueue, tfjsJobResponse) {
+async function writeQueue(outputQueue, tfjsJobResponse, rabbitmqConnectionSettings) {
     return new Promise(async function (resolve, reject) {
         let connection;
         try {
-            connection = await amqp.connect(queueUrl);
+            connection = await amqp.connect(Object.assign({
+                protocol: 'amqp',
+                locale: 'en_US',
+                frameMax: 0,
+                heartbeat: 0,
+                vhost: '/',
+              }, rabbitmqConnectionSettings ?? rabbitmqDefaultConnectionSettings));
             const channel = await connection.createChannel();
 
             await channel.assertQueue(outputQueue, { durable: true });
@@ -169,7 +186,7 @@ const createJob = async (jobName, parallelism, alternativeWorker) => {
 }
 
 module.exports = class WorkerTraining extends DistributedTrainingInterface {
-    constructor(jobName, parallelism, podResponseTimeThreshold, alternativeWorker) {
+    constructor(jobName, parallelism, podResponseTimeThreshold, alternativeWorker, rabbitmqConnectionSettings) {
         super();
         this.jobName = jobName;
         this.outputQueuePrefix = jobName + "-OUTPUT";
@@ -177,6 +194,7 @@ module.exports = class WorkerTraining extends DistributedTrainingInterface {
         this.parallelism = parallelism;
         this.podResponseTimeThreshold = podResponseTimeThreshold;
         this.alternativeWorker = alternativeWorker;
+        this.rabbitmqConnectionSettings = rabbitmqConnectionSettings;
         console.log(`jobName ${jobName}`);
     }
 
@@ -205,8 +223,8 @@ module.exports = class WorkerTraining extends DistributedTrainingInterface {
                             modelAbortThreshold: modelAbortThreshold,
                             modelTrainingTimeThreshold: modelTrainingTimeThreshold
                         },
-                    });
-                    var tfjsJob = (await readQueue(`${self.outputQueuePrefix}-${phenotype._id}`, self.podResponseTimeThreshold * 1000));
+                    }, self.rabbitmqConnectionSettings);
+                    var tfjsJob = (await readQueue(`${self.outputQueuePrefix}-${phenotype._id}`, self.podResponseTimeThreshold * 1000, self.rabbitmqConnectionSettings));
                     if (tfjsJob && tfjsJob.modelJson) {
                         switch (self.alternativeWorker) {
                             case "python":

@@ -94,9 +94,9 @@ async function testPredefinedModelsAgainstGA() {
                 }
                 else {
                     var newPhenotype = {
-                        epochs: ga.mutateNumber(oldPhenotype.epochs, true, 50, true, 5),
-                        batchSize: ga.mutateNumber(oldPhenotype.batchSize, true, 50, true, 10),
-                        learningRate: ga.mutateNumber(oldPhenotype.learningRate, false, 100, true),
+                        epochs: ga.mutateNumber(oldPhenotype.epochs, true, 3, true, 5),
+                        batchSize: ga.mutateNumber(oldPhenotype.batchSize, true, 5, true, 10),
+                        learningRate: ga.mutateNumber(oldPhenotype.learningRate, false, 0.005, true),
                         hiddenLayerUnits: ga.mutateNumber(oldPhenotype.hiddenLayerUnits, true, 100, true, 1, 300),
                         activation: ga.mutateOptions(oldPhenotype.activation, ga.ACTIVATIONS),
                         kernelInitializer: ga.mutateOptions(oldPhenotype.kernelInitializer, ga.KERNEL_INITIALIZERS),

@@ -399,27 +399,31 @@ module.exports = function TFJSGeneticAlgorithmConstructor(options) {
             return res;
         },
 
-        mutateNumber: function (n, stripDecimals, maximumPercentageChange, alwaysBiggerThanZero, permittedMinimum, permittedMaximum, callStackSize) {
+        mutateNumber: function (n, stripDecimals, maximumChange, alwaysBiggerThanZero, permittedMinimum, permittedMaximum, callStackSize) {
             n = parseFloat(n);
             if (Math.random() > _mutationLevel) return n;
             if (callStackSize && callStackSize > 100) return n;
             var res = n;
             var changeDirection = 1;
             if (Math.random() < 0.5) changeDirection = -1;
-            if (res == 0 && Math.random() < 0.5 && !alwaysBiggerThanZero && permittedMinimum == 0) {
-                res = maximumPercentageChange / 100 / 2;
+            if (res == 0 && Math.random() < 0.5 && !alwaysBiggerThanZero) {
+                res = maximumChange;
             }
-            var changeMaximum = res / 100 * maximumPercentageChange;
+
             var actualChange = Math.random() * 100;
-            res = res + (changeMaximum / 100 * actualChange * changeDirection);
+            res = res + (maximumChange / 100 * actualChange * changeDirection);
             if (stripDecimals) {
                 res = Math.round(res);
             }
 
             if (alwaysBiggerThanZero && res <= 0) res = n;
+            
+            if (res < permittedMinimum && !alwaysBiggerThanZero && Math.random() < 0.5){
+            	res = 0;
+            } 
 
             if (res < permittedMinimum || res > permittedMaximum) {
-                return this.mutateNumber(n, stripDecimals, maximumPercentageChange, alwaysBiggerThanZero, permittedMinimum, permittedMaximum, callStackSize ? callStackSize + 1 : 1);
+                return this.mutateNumber(n, stripDecimals, maximumChange, alwaysBiggerThanZero, permittedMinimum, permittedMaximum, callStackSize ? callStackSize + 1 : 1);
             }
 
             return res;
