@@ -195,10 +195,11 @@ module.exports = function geneticAlgorithmConstructor(options) {
                         nextGeneration.push(cp);
                     }
                 }
-                newPromise.then(r=>{
-                    nextGeneration.push(r);
-                    removeArrayItem(promises, newPromise);                
-                })
+                if (newPromise)
+                    newPromise.then(r => {
+                        nextGeneration.push(r);
+                        removeArrayItem(promises, newPromise);
+                    });
                 if (settings.parallelProcessing && settings.parallelism && settings.parallelism > 0 /*&& ((promises.length == settings.parallelism * 3) || (promises.length > 0 && p == settings.population.length - 2))*/) {
                     // var responses = await Promise.all(promises);
                     // nextGeneration.push(...responses);
