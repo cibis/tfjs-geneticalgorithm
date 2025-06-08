@@ -45,6 +45,26 @@ module.exports = function geneticAlgorithmConstructor(options) {
 
     var settings = settingWithDefaults(options, settingDefaults())
 
+    function waitForCondition(conditionFn, interval = 1000) {
+        return new Promise(resolve => {
+            const checkCondition = () => {
+                if (conditionFn()) {
+                    resolve();
+                } else {
+                    setTimeout(checkCondition, interval);
+                }
+            };
+            checkCondition();
+        });
+    }
+
+    function removeArrayItem(array, item) {
+        var index = array.indexOf(item);
+        if (index !== -1) {
+            array.splice(index, 1);
+        }
+    }
+
     async function populate() {
         var size = settings.population.length
         var addNewPhenotype = async () => {
@@ -72,30 +92,42 @@ module.exports = function geneticAlgorithmConstructor(options) {
             var requiredPopulation = settings.populationSize - settings.population.length;
             var promises = [];
             for (var i = 0; i < requiredPopulation; i++) {
-                promises.push(mutate(cloneJSON(getPhenotypeToClone())));
-                if (settings.parallelism && settings.parallelism > 0 && (promises.length == settings.parallelism || (promises.length > 0 && i == requiredPopulation - 1))) {
-                    var responses = await Promise.all(promises);
-                    responses.forEach(newItem => {
+                var newPromise = mutate(cloneJSON(getPhenotypeToClone()));
+                promises.push(newPromise);
+                newPromise.then(newItem=>{
                         newItem._type = 'MUTATION';
                         newItem._id = utils.guidGenerator();
     
                         settings.population.push(
                             newItem
                         )
-                    });
-                    promises = [];
+                    removeArrayItem(promises, newPromise); 
+                });                
+                if (settings.parallelism && settings.parallelism > 0/* && (promises.length == settings.parallelism || (promises.length > 0 && i == requiredPopulation - 1))*/) {
+                    // var responses = await Promise.all(promises);
+                    // responses.forEach(newItem => {
+                    //     newItem._type = 'MUTATION';
+                    //     newItem._id = utils.guidGenerator();
+    
+                    //     settings.population.push(
+                    //         newItem
+                    //     )
+                    // });
+                    // promises = [];
+                    await waitForCondition(()=> promises.length < settings.parallelism)
                 }       
             }
             if (promises.length) {
-                var responses = await Promise.all(promises);
-                responses.forEach(newItem => {
-                    newItem._type = 'MUTATION';
-                    newItem._id = utils.guidGenerator();
+                await Promise.all(promises);
+                // var responses = await Promise.all(promises);
+                // responses.forEach(newItem => {
+                //     newItem._type = 'MUTATION';
+                //     newItem._id = utils.guidGenerator();
 
-                    settings.population.push(
-                        newItem
-                    )
-                });
+                //     settings.population.push(
+                //         newItem
+                //     )
+                // });
             }
         }
         else {
@@ -144,32 +176,43 @@ module.exports = function geneticAlgorithmConstructor(options) {
             nextGeneration.push(phenotype)
 
             if (doesABeatB(phenotype, competitor)) {
+                var newPromise;
                 if (Math.random() < 0.5) {
-                    if (settings.parallelProcessing)
-                        promises.push(mutate(phenotype));                   
+                    if (settings.parallelProcessing){
+                        newPromise = mutate(phenotype);
+                        promises.push(newPromise);    
+                    }               
                     else
                         nextGeneration.push(await mutate(phenotype));
                 } 
                 else {
-                    if (settings.parallelProcessing)
-                        promises.push(crossover(phenotype));
+                    if (settings.parallelProcessing){
+                        newPromise = crossover(phenotype);
+                        promises.push(newPromise);
+                    }
                     else {
                         var cp = await crossover(phenotype);
                         nextGeneration.push(cp);
                     }
                 }
-                if (settings.parallelProcessing && settings.parallelism && settings.parallelism > 0 && (promises.length == settings.parallelism || (promises.length > 0 && p == settings.population.length - 2))) {
-                    var responses = await Promise.all(promises);
-                    nextGeneration.push(...responses);
-                    promises = [];
+                newPromise.then(r=>{
+                    nextGeneration.push(r);
+                    removeArrayItem(promises, newPromise);                
+                })
+                if (settings.parallelProcessing && settings.parallelism && settings.parallelism > 0 /*&& ((promises.length == settings.parallelism * 3) || (promises.length > 0 && p == settings.population.length - 2))*/) {
+                    // var responses = await Promise.all(promises);
+                    // nextGeneration.push(...responses);
+                    // promises = [];
+                    await waitForCondition(()=> promises.length < settings.parallelism)
                 }     
             } else {
                 nextGeneration.push(competitor)
             }
         }
         if (promises.length) {
-            var responses = await Promise.all(promises);
-            nextGeneration.push(...responses);
+            await Promise.all(promises);
+            // var responses = await Promise.all(promises);
+            // nextGeneration.push(...responses);
         }
 
         settings.population = nextGeneration;
@@ -216,11 +259,17 @@ module.exports = function geneticAlgorithmConstructor(options) {
                     phenotype._id = utils.guidGenerator();
 
                     if (settings.parallelProcessing) {  
-                        promises.push(settings.cloneFunction(phenotype));                      
-                        if (settings.parallelism && settings.parallelism > 0 && (promises.length == settings.parallelism || (promises.length > 0 && i == competitionSize - 1))) {
-                            var responses = await Promise.all(promises);
-                            res.push(...responses);
-                            promises = [];
+                        var newPromise = settings.cloneFunction(phenotype);
+                        promises.push(newPromise);    
+                        newPromise.then(r=>{
+                            res.push(r);
+                            removeArrayItem(promises, newPromise);
+                        });                  
+                        if (settings.parallelism && settings.parallelism > 0/* && (promises.length == settings.parallelism || (promises.length > 0 && i == competitionSize - 1))*/) {
+                            // var responses = await Promise.all(promises);
+                            // res.push(...responses);
+                            // promises = [];
+                            await waitForCondition(()=> promises.length < settings.parallelism)
                         }
                     }                    
                     else {
@@ -228,8 +277,9 @@ module.exports = function geneticAlgorithmConstructor(options) {
                     }
                 }
                 if (promises.length) {
-                    var responses = await Promise.all(promises);
-                    res.push(...responses);
+                    await Promise.all(promises);
+                    //var responses = await Promise.all(promises);
+                    //res.push(...responses);
                 }
                 console.log("all promises completed");
 

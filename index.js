@@ -312,7 +312,7 @@ module.exports = function TFJSGeneticAlgorithmConstructor(options) {
     }
 
     return {
-        ACTIVATIONS: ['elu', 'linear', 'relu', 'relu6', 'selu', 'sigmoid', 'softmax', 'softplus', 'softsign', 'tanh'],
+        ACTIVATIONS: ['elu', /*'linear', */'relu', 'relu6', 'selu', 'sigmoid', 'softmax', 'softplus', 'softsign', 'tanh'],
         KERNEL_INITIALIZERS: ['leCunNormal', 'glorotNormal', 'glorotUniform', 'heNormal', 'heUniform', 'leCunUniform', 'randomNormal', 'randomUniform', 'truncatedNormal', 'varianceScaling'],
         OPTIMIZERS: ['sgd', 'adagrad', 'adadelta', 'adam', 'adamax', 'rmsprop'],
         
