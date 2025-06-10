@@ -1,6 +1,7 @@
 const amqp = require("amqplib");
 const k8s = require('@kubernetes/client-node');
 const tf = require('@tensorflow/tfjs-node');
+const fs = require('fs');
 var ModelStorage = require("../../model-storage/current")
 
 const NEW_MESSAGE_WAIT_TIME = 20000;
@@ -11,13 +12,28 @@ const rabbitmqDefaultConnectionSettings = {
     port: 30000,
     username: 'guest',
     password: 'guest',
+    protocol: 'amqp',
+    locale: 'en_US',
+    frameMax: 0, 
+    heartbeat: 0,
+    vhost: '/'    
 };
 
-const kc = new k8s.KubeConfig();
-kc.loadFromDefault();
+var k8sApi;
+var k8sBatchApi;
 
-const k8sApi = kc.makeApiClient(k8s.CoreV1Api);
-const k8sBatchApi = kc.makeApiClient(k8s.BatchV1Api);
+function initKB(data) {
+    const kc = new k8s.KubeConfig();
+    if (!data)
+        kc.loadFromDefault();
+    else
+        kc.loadFromString(data);
+    //const data = fs.readFileSync('kb-config.yaml', 'utf8');
+    
+    k8sApi = kc.makeApiClient(k8s.CoreV1Api);
+    k8sBatchApi = kc.makeApiClient(k8s.BatchV1Api);
+}
+
 
 var DistributedTrainingInterface = require("../DistributedTrainingInterface");
 var utils = require("../../utils")
@@ -26,13 +42,7 @@ async function readQueue(inputQueue, waitTimeThreshold, rabbitmqConnectionSettin
     return new Promise(async function (resolve, reject) {
         try {
             //console.log(`${Date.now()} readQueue ${inputQueue}`);
-            const connection = await amqp.connect(Object.assign({
-                protocol: 'amqp',
-                locale: 'en_US',
-                frameMax: 0,
-                heartbeat: 0,
-                vhost: '/',
-              }, rabbitmqConnectionSettings ?? rabbitmqDefaultConnectionSettings));
+            const connection = await amqp.connect(Object.assign(rabbitmqDefaultConnectionSettings, rabbitmqConnectionSettings));
             const channel = await connection.createChannel();
 
             process.once("SIGINT", async () => {
@@ -95,13 +105,7 @@ async function writeQueue(outputQueue, tfjsJobResponse, rabbitmqConnectionSettin
     return new Promise(async function (resolve, reject) {
         let connection;
         try {
-            connection = await amqp.connect(Object.assign({
-                protocol: 'amqp',
-                locale: 'en_US',
-                frameMax: 0,
-                heartbeat: 0,
-                vhost: '/',
-              }, rabbitmqConnectionSettings ?? rabbitmqDefaultConnectionSettings));
+            connection = await amqp.connect(Object.assign(rabbitmqDefaultConnectionSettings, rabbitmqConnectionSettings));
             const channel = await connection.createChannel();
 
             await channel.assertQueue(outputQueue, { durable: true });
@@ -134,7 +138,7 @@ const isJobStarted = async (jobName) => {
 }
 
 
-const createJob = async (jobName, parallelism, alternativeWorker) => {
+const createJob = async (jobName, parallelism, alternativeWorker, resources, env) => {
     console.log(`createJob alternativeWorker: ${alternativeWorker}`)
     var imageName = typeof alternativeWorker != "undefined" && alternativeWorker == "python" ? 'tfjs-ks-python-worker' : 'tfjs-ks-worker'
     var jobSettings = {
@@ -168,12 +172,13 @@ const createJob = async (jobName, parallelism, alternativeWorker) => {
                                 name: "job-tfjs-node-storage"
                             }
                         ],
-                        env: [
+                        env: [...[
                             {
                                 name: "JOB_NAME",
                                 value: jobName
                             }
-                        ]
+                        ], ...env],
+                        resources: resources
                     }],
                     restartPolicy: "Never"
                 }
@@ -186,7 +191,7 @@ const createJob = async (jobName, parallelism, alternativeWorker) => {
 }
 
 module.exports = class WorkerTraining extends DistributedTrainingInterface {
-    constructor(jobName, parallelism, podResponseTimeThreshold, alternativeWorker, rabbitmqConnectionSettings) {
+    constructor(jobName, parallelism, podResponseTimeThreshold, alternativeWorker, settings) {
         super();
         this.jobName = jobName;
         this.outputQueuePrefix = jobName + "-OUTPUT";
@@ -194,12 +199,22 @@ module.exports = class WorkerTraining extends DistributedTrainingInterface {
         this.parallelism = parallelism;
         this.podResponseTimeThreshold = podResponseTimeThreshold;
         this.alternativeWorker = alternativeWorker;
-        this.rabbitmqConnectionSettings = rabbitmqConnectionSettings;
+        this.settings = settings;  
+        this.resources = {};    
+        this.env = [];  
+        if (settings) {
+            this.rabbitmqConnectionSettings = settings.rabbitmqConnectionSettings;
+            if(settings.resources) this.resources = settings.resources;
+            if(settings.env && settings.env.length) this.env = settings.env;
+            if(settings.kb)
+                this.kb = settings.kb;
+        } 
+        initKB(settings.kb);
         console.log(`jobName ${jobName}`);
     }
 
     async startJob() {
-        if(!(await isJobStarted(this.jobName))) await createJob(this.jobName, this.parallelism, this.alternativeWorker);
+        if(!(await isJobStarted(this.jobName))) await createJob(this.jobName, this.parallelism, this.alternativeWorker, this.resources, this.env);
     }
 
     async stopJob() {
@@ -213,7 +228,7 @@ module.exports = class WorkerTraining extends DistributedTrainingInterface {
         return new Promise((resolve, reject) => {
             var runTask = async function (resolve, reject) {
                 try {
-                    console.log(`send to worker: ${JSON.stringify(phenotype)}\n`);
+                    console.log(`${new Date().toLocaleTimeString()} send to worker: ${JSON.stringify(phenotype)}\n`);
                     await writeQueue(self.inputQueue, {
                         workerData: { 
                             phenotype: phenotype, 
