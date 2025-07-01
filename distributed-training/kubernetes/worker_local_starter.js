@@ -2,15 +2,25 @@ const amqp = require("amqplib");
 const tf = require('@tensorflow/tfjs-node');
 var ModelStorage = require("../../model-storage/current")
 
-const queueUrl = "amqp://127.0.0.1:30000";
-
+const queueUrl = "amqp://192.168.2.28:30000";
+const rabbitmqDefaultConnectionSettings = {
+    hostname: '192.168.2.28',
+    port: 30000,
+    username: 'guest',
+    password: 'guest',
+    protocol: 'amqp',
+    locale: 'en_US',
+    frameMax: 0, 
+    heartbeat: 0,
+    vhost: '/'    
+};
 
 var DistributedTrainingInterface = require("../DistributedTrainingInterface");
 
 async function readQueue(inputQueue, waitTimeThreshold) {
     return new Promise(async function (resolve, reject) {
         try {
-            const connection = await amqp.connect(queueUrl);
+            const connection = await amqp.connect(rabbitmqDefaultConnectionSettings);
             const channel = await connection.createChannel();
 
             process.once("SIGINT", async () => {
@@ -25,7 +35,7 @@ async function readQueue(inputQueue, waitTimeThreshold) {
                     await channel.close();
                     await connection.close();
                     resolve(null);
-                }, waitTimeThreshold);
+                }, waitTimeThreshold + (10 * 60 * 1000)/* the extra time required for caching the dataset on the worker*/);
             }
             await channel.consume(
                 inputQueue,
@@ -34,7 +44,13 @@ async function readQueue(inputQueue, waitTimeThreshold) {
                         clearInterval(timeoutInterval);
                     }
                     if (message) {
-                        resolve(JSON.parse((message.content).toString()));
+                        try {
+                            var messageData = JSON.parse((message.content).toString());
+                            resolve(messageData);
+                        }
+                        catch (parseEx) {
+                            resolve(null);
+                        }
                     }
                     else{
                         resolve(null);
@@ -57,7 +73,7 @@ async function writeQueue(outputQueue, tfjsJobResponse) {
     return new Promise(async function (resolve, reject) {
         let connection;
         try {
-            connection = await amqp.connect(queueUrl);
+            connection = await amqp.connect(rabbitmqDefaultConnectionSettings);
             const channel = await connection.createChannel();
 
             await channel.assertQueue(outputQueue, { durable: true });
@@ -86,14 +102,22 @@ module.exports = class WorkerTraining extends DistributedTrainingInterface {
         console.log(`jobName ${jobName}`);
     }
 
-    trainModel(phenotype, modelJson, tensors, validationSplit, modelAbortThreshold, modelTrainingTimeThreshold) {
+    async startJob() {
+        
+    }
+
+    async stopJob() {
+
+    }
+
+    trainModel(phenotype, modelJson, tensors, validationSplit, modelAbortThreshold, modelTrainingTimeThreshold, baseline) {
         var self = this;
         console.log(`trainModel -> jobName: ${self.jobName}, phenotype._id: ${phenotype._id}`);
         
         return new Promise((resolve, reject) => {
             var runTask = async function (resolve, reject) {
                 try {
-                    
+                    console.log(`${new Date().toLocaleTimeString()} send to worker: ${JSON.stringify(phenotype)}\n`);
                     await writeQueue(self.inputQueue, {
                         workerData: { 
                             phenotype: phenotype, 
@@ -101,36 +125,42 @@ module.exports = class WorkerTraining extends DistributedTrainingInterface {
                             tensors: tensors,
                             validationSplit: validationSplit, 
                             modelAbortThreshold: modelAbortThreshold,
-                            modelTrainingTimeThreshold: modelTrainingTimeThreshold
+                            modelTrainingTimeThreshold: modelTrainingTimeThreshold,
+                            baseline: baseline
                         },
                     });
                     var tfjsJob = (await readQueue(`${self.outputQueuePrefix}-${phenotype._id}`, self.podResponseTimeThreshold * 1000));
-                    if (tfjsJob && tfjsJob.modelJson) {
-                        switch (self.alternativeWorker) {
-                            case "python":
-                                {
-                                    ModelStorage.writeModelBuffer(phenotype._id, Buffer.from(tfjsJob.modelJson, "hex"));
-                                }
-                                break;
-                            default:
-                                {
-                                    const modelData = JSON.parse(tfjsJob.modelJson);
-                                    const weightData = new Uint8Array(Buffer.from(modelData.weightData, "base64")).buffer;
-                                    const model = await tf.loadLayersModel(tf.io.fromMemory(
-                                        {
-                                            modelTopology: modelData.modelTopology,
-                                            weightSpecs: modelData.weightSpecs,
-                                            weightData: weightData
+                    try {
+                        if (tfjsJob && tfjsJob.modelJson) {
+                            switch (self.alternativeWorker) {
+                                case "python":
+                                    {
+                                        ModelStorage.writeModelBuffer(phenotype._id, Buffer.from(tfjsJob.modelJson, "hex"), tfjsJob.phenotype);
+                                    }
+                                    break;
+                                default:
+                                    {
+                                        const modelData = JSON.parse(tfjsJob.modelJson);
+                                        const weightData = new Uint8Array(Buffer.from(modelData.weightData, "base64")).buffer;
+                                        const model = await tf.loadLayersModel(tf.io.fromMemory(
+                                            {
+                                                modelTopology: modelData.modelTopology,
+                                                weightSpecs: modelData.weightSpecs,
+                                                weightData: weightData
 
-                                        }));
-                                    ModelStorage.writeModel(phenotype._id, model);
-                                }
-                                break;
+                                            }));
+                                        ModelStorage.writeModel(phenotype._id, model);
+                                    }
+                                    break;
+                            }
+                            resolve({ validationLoss: tfjsJob.validationLoss, phenotype: tfjsJob.phenotype });
+                        } else {
+                            resolve({ validationLoss: NaN, phenotype: phenotype });
                         }
-                        resolve({ validationLoss: tfjsJob.validationLoss, phenotype: tfjsJob.phenotype });
-                    } else {
+                    }
+                    catch (readQueueEx) { 
                         resolve({ validationLoss: NaN, phenotype: phenotype });
-                    } 
+                    }
                 }
                 catch (e) { reject(e) }                    
             }            

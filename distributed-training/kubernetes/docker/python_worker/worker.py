@@ -11,7 +11,9 @@ import traceback
 from utils import DictToObj
 import time
 from keras.src import callbacks
-
+import importlib
+import socket
+from datetime import datetime, timedelta
 
 SETTINGS = { "TEST_MODE" : False}
 
@@ -26,8 +28,62 @@ RABBITMQ_PORT = None #int(os.getenv('RABBITMQ_PORT', 5672))
 inputQueue = None #os.environ["JOB_NAME"] + "-INPUT"
 outputQueuePrefix = None #os.environ["JOB_NAME"] + "-OUTPUT"
 
+def get_local_ip():
+    """
+    Retrieves the local IP address of the machine.
+    """
+    try:
+        # Get the hostname of the local machine
+        hostname = socket.gethostname()
+        # Get the IP address associated with the hostname
+        ip_address = socket.gethostbyname(hostname)
+        return ip_address
+    except socket.error as e:
+        print(f"Error getting local IP address: {e}")
+        return None
+
 def guidGenerator():
     return str(uuid.uuid4())                                                  
+
+
+class CustomEarlyStopCallback(callbacks.Callback):
+    train_logs = []
+    loss_threshold_abort = False
+    training_start_time = datetime.now()
+    epoch_time_start = datetime.now()
+    stopped_epoch = 1
+    
+    def __init__(self, model_training_time_threshold, baseline, phenotype, wguid):
+        self.model_training_time_threshold = model_training_time_threshold
+        self.baseline = baseline
+        self.phenotype = phenotype
+        self.wguid = wguid
+        print(f"CustomEarlyStopCallback. model_training_time_threshold {model_training_time_threshold},  baseline {baseline}")
+
+    def on_epoch_begin(self, epoch, logs=None):
+        self.epoch_time_start = datetime.now()
+    
+    def on_epoch_end(self, epoch, logs=None):
+        self.stopped_epoch = epoch + 1
+
+        if self.model_training_time_threshold is not None: 
+            time_delta = timedelta(seconds=self.model_training_time_threshold)
+            if datetime.now() > self.training_start_time + time_delta:
+                print(f"Model training timeout abort. Epoch {epoch} ")
+                self.model.stop_training = True
+        if self.baseline is not None and ((logs.get('loss') is not None and logs.get('loss') > self.baseline) or (logs.get('val_loss') is not None and logs.get('val_loss') > self.baseline)):  
+            print(f"Early threshold abort. Epoch {epoch} ")
+            self.model.stop_training = True    
+            time.sleep(5)                   
+
+        signalHeartbeat(self.phenotype["_id"], {
+            "jobName": os.environ["JOB_NAME"], 
+            "wguid": self.wguid, 
+            "epoch": epoch,
+            "loss": logs.get('loss'),
+            "stop_training" : self.model.stop_training,
+            "ip": get_local_ip()
+        })
 
 class DataSet:
     def __init__(self, host, path, port, cache_id, cache_batch_size, options):
@@ -163,15 +219,23 @@ def trainModel(wguid, model, workerdata, trainDS, trainDS_genRes, trainValidatio
                                                         patience=patience,
                                                         mode='min',
                                                         restore_best_weights=True)  
+    
+    custom_early_stopping = CustomEarlyStopCallback(workerdata["modelTrainingTimeThreshold"], workerdata["baseline"], workerdata["phenotype"], wguid)
+
     history = model.fit(trainDS, epochs=workerdata["phenotype"]["epochs"], steps_per_epoch = trainDS_genRes.maxBatchIndex - trainDS_genRes.minBatchIndex + 1, validation_steps = trainValidationDS_genRes.maxBatchIndex - trainValidationDS_genRes.minBatchIndex + 1,
                         validation_data=trainValidationDS,
-                        callbacks=[early_stopping, callbacks.TerminateOnNaN()])  
+                        callbacks=[early_stopping, callbacks.TerminateOnNaN(), custom_early_stopping])  
     
     val_performance = model.evaluate(validationDS, return_dict=True)
     loss = val_performance["loss"]
     if min(early_stopping.best_epoch, early_stopping.stopped_epoch) > 0:        
         print(f'adjusted epoch: original: {workerdata["phenotype"]["epochs"]}, new: {min(early_stopping.best_epoch, early_stopping.stopped_epoch)}')
         workerdata["phenotype"]["epochs"] = min(early_stopping.best_epoch, early_stopping.stopped_epoch)
+
+    elif custom_early_stopping.stopped_epoch > 0:        
+        print(f'adjusted epoch: original: {workerdata["phenotype"]["epochs"]}, new: {custom_early_stopping.stopped_epoch}')
+        workerdata["phenotype"]["epochs"] = custom_early_stopping.stopped_epoch     
+
     workerdata["phenotype"]["validationLoss"] = loss
     keras_model_path = f'{CACHE_STORAGE}{wguid}.keras'
     model.save(keras_model_path)
@@ -246,6 +310,12 @@ def writeQueue(id, tfjsJobResponse):
     rabbitmq = RabbitMQ(RABBITMQ_HOST, RABBITMQ_PORT)
     rabbitmq.publish(outputQueue, json.dumps(tfjsJobResponse))
     rabbitmq.close()  
+
+def signalHeartbeat(id, data):
+    heartbeatOutputQueue = f"{outputQueuePrefix}-{id}-heartbeat"
+    rabbitmq = RabbitMQ(RABBITMQ_HOST, RABBITMQ_PORT)
+    rabbitmq.publish(heartbeatOutputQueue, json.dumps(data))
+    rabbitmq.close()      
 
 def ds_gen(data_source, options):
      trainDS = DataSet(data_source["host"], data_source["path"], data_source["port"], data_source["pre_cache"], data_source["cache_batch_size"], options)

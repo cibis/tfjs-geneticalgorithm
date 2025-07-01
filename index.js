@@ -28,7 +28,7 @@ module.exports = function TFJSGeneticAlgorithmConstructor(options) {
     /**
      * The level of mutation. Range 0-1. The bigger the number the more often mutations will happen. Example: _mutationLevel = 0.2 mutations will happen in 2 out of 10 cases
      */
-    var _mutationLevel = 0.9;
+    var _mutationLevel = options.baseMutationLevel ?? 0.9;
 
     function cloneJSON(object) {
         return JSON.parse(JSON.stringify(object))
@@ -323,7 +323,7 @@ module.exports = function TFJSGeneticAlgorithmConstructor(options) {
          * @returns The model with the smallest loss
          */
         evolve: async function (evolveGenerations, elitesGenerations) {
-            _mutationLevel = 0.9;
+            _mutationLevel = options.baseMutationLevel ?? 0.9;
             start();
             evolveGenerations = evolveGenerations || 1;
             var generationBest = [];
@@ -346,7 +346,7 @@ module.exports = function TFJSGeneticAlgorithmConstructor(options) {
             }
             if (elitesGenerations) {
                 if (generationBest.length > 1) {
-                    _mutationLevel = 0.5;
+                    _mutationLevel = options.elitesMutationLevel ?? 0.5;
                     var evolveGenerationBest = cloneJSON(generationBest);
                     for (var i = 0; i < elitesGenerations; i++) {
                         ga.updatePopulation(evolveGenerationBest);

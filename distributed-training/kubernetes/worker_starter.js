@@ -64,7 +64,7 @@ async function readQueue(inputQueue, waitTimeThreshold, rabbitmqConnectionSettin
                     }
                     catch (closeErr) { }
                     resolve(null);
-                }, waitTimeThreshold);
+                }, waitTimeThreshold + (10 * 60 * 1000)/* the extra time required for caching the dataset on the worker*/);
             }
             await channel.consume(
                 inputQueue,
@@ -221,7 +221,7 @@ module.exports = class WorkerTraining extends DistributedTrainingInterface {
         await deleteJob(this.jobName);
     }
 
-    trainModel(phenotype, modelJson, tensors, validationSplit, modelAbortThreshold, modelTrainingTimeThreshold) {
+    trainModel(phenotype, modelJson, tensors, validationSplit, modelAbortThreshold, modelTrainingTimeThreshold, baseline) {
         var self = this;
         console.log(`trainModel -> jobName: ${self.jobName}, phenotype._id: ${phenotype._id}`);
         
@@ -236,7 +236,8 @@ module.exports = class WorkerTraining extends DistributedTrainingInterface {
                             tensors: tensors,
                             validationSplit: validationSplit, 
                             modelAbortThreshold: modelAbortThreshold,
-                            modelTrainingTimeThreshold: modelTrainingTimeThreshold
+                            modelTrainingTimeThreshold: modelTrainingTimeThreshold,
+                            baseline: baseline
                         },
                     }, self.rabbitmqConnectionSettings);
                     var tfjsJob = (await readQueue(`${self.outputQueuePrefix}-${phenotype._id}`, self.podResponseTimeThreshold * 1000, self.rabbitmqConnectionSettings));
