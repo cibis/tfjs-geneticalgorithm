@@ -3,6 +3,7 @@ const tf = require('@tensorflow/tfjs-node');
 var ModelStorage = require("../../model-storage/current")
 
 const queueUrl = "amqp://192.168.2.28:30000";
+
 const rabbitmqDefaultConnectionSettings = {
     hostname: '192.168.2.28',
     port: 30000,
@@ -17,23 +18,31 @@ const rabbitmqDefaultConnectionSettings = {
 
 var DistributedTrainingInterface = require("../DistributedTrainingInterface");
 
-async function readQueue(inputQueue, waitTimeThreshold) {
+async function readQueue(inputQueue, waitTimeThreshold, rabbitmqConnectionSettings) {
     return new Promise(async function (resolve, reject) {
         try {
-            const connection = await amqp.connect(rabbitmqDefaultConnectionSettings);
+            //console.log(`${Date.now()} readQueue ${inputQueue}`);
+            const connection = await amqp.connect(Object.assign(rabbitmqDefaultConnectionSettings, rabbitmqConnectionSettings));
             const channel = await connection.createChannel();
 
             process.once("SIGINT", async () => {
-                await channel.close();
-                await connection.close();
+                try {
+                    await channel.close();
+                    await connection.close();
+                }
+                catch (closeErr) { }
                 resolve(null);
             });
+            //console.log(`RESULT QUEUE ${inputQueue}`)
             await channel.assertQueue(inputQueue, { durable: true });
             await channel.prefetch(1);
             if (waitTimeThreshold) {
                 var timeoutInterval = setTimeout(async () => {
-                    await channel.close();
-                    await connection.close();
+                    try {
+                        await channel.close();
+                        await connection.close();
+                    }
+                    catch (closeErr) { }
                     resolve(null);
                 }, waitTimeThreshold + (10 * 60 * 1000)/* the extra time required for caching the dataset on the worker*/);
             }
@@ -44,20 +53,24 @@ async function readQueue(inputQueue, waitTimeThreshold) {
                         clearInterval(timeoutInterval);
                     }
                     if (message) {
+                        var jsonParse = null;
                         try {
-                            var messageData = JSON.parse((message.content).toString());
-                            resolve(messageData);
+                            jsonParse = JSON.parse((message.content).toString());
                         }
-                        catch (parseEx) {
-                            resolve(null);
+                        catch (parseErr) {
+                            console.log(`worker response parse error: err: ${parseErr}`)
                         }
+                        resolve(jsonParse);
                     }
                     else{
                         resolve(null);
                     }
                     await channel.ack(message);
-                    await channel.close();
-                    await connection.close();
+                    try {
+                        await channel.close();
+                        await connection.close();
+                    }
+                    catch (closeErr) { }
                 }
             );
 
@@ -68,23 +81,24 @@ async function readQueue(inputQueue, waitTimeThreshold) {
 }
 
 
-async function writeQueue(outputQueue, tfjsJobResponse) {
-    //console.log(`writeQueue outputQueue: ${outputQueue}, tfjsJobResponse: ${JSON.stringify(tfjsJobResponse)}`)
+async function writeQueue(outputQueue, tfjsJobResponse, rabbitmqConnectionSettings) {
     return new Promise(async function (resolve, reject) {
         let connection;
         try {
-            connection = await amqp.connect(rabbitmqDefaultConnectionSettings);
+            connection = await amqp.connect(Object.assign(rabbitmqDefaultConnectionSettings, rabbitmqConnectionSettings));
             const channel = await connection.createChannel();
 
             await channel.assertQueue(outputQueue, { durable: true });
             channel.sendToQueue(outputQueue, Buffer.from(JSON.stringify(tfjsJobResponse)));
-            await channel.close();
+            try {
+                await channel.close();
+                await connection.close();
+            }
+            catch (closeErr) { }
             resolve();
         } catch (err) {
             console.warn(err);
             reject(err);
-        } finally {
-            if (connection) await connection.close();
         }
     });
 }
@@ -153,7 +167,7 @@ module.exports = class WorkerTraining extends DistributedTrainingInterface {
                                     }
                                     break;
                             }
-                            resolve({ validationLoss: tfjsJob.validationLoss, phenotype: tfjsJob.phenotype });
+                            resolve({ validationLoss: tfjsJob.validationLoss, phenotype: tfjsJob.phenotype, predictionsJson: tfjsJob.predictionsJson });
                         } else {
                             resolve({ validationLoss: NaN, phenotype: phenotype });
                         }

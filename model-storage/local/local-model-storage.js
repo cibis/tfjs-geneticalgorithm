@@ -29,10 +29,15 @@ module.exports = class LocalModelStorage extends ModelStorageInterface {
             fs.writeFileSync(`${MODEL_STORAGE}${modelId}/phenotype.json`, JSON.stringify(phenotype), 'utf8')
     }
 
+    async updatePhenotype(modelId,  phenotype){
+        if(!modelId || !fs.existsSync(BEST_MODEL_STORAGE)) throw Error("modelId is undefined");
+        fs.writeFileSync(`${MODEL_STORAGE}${modelId}/phenotype.json`, JSON.stringify(phenotype), 'utf8');
+    }
+
     async writePhenotype(modelId, phenotype){
         if(!modelId) throw Error("modelId is undefined");
         fs.writeFileSync(`${MODEL_STORAGE}${modelId}/phenotype.json`, JSON.stringify(phenotype), 'utf8')
-    }    
+    }
 
     async writeModelBuffer(modelId, bufferData, phenotype){
         if(!modelId) throw Error("modelId is undefined");
@@ -44,6 +49,13 @@ module.exports = class LocalModelStorage extends ModelStorageInterface {
         }
         fs.writeFileSync(`${MODEL_STORAGE}${modelId}/model.keras`, bufferData);
         fs.writeFileSync(`${MODEL_STORAGE}${modelId}/phenotype.json`, JSON.stringify(phenotype), 'utf8')
+    }
+
+    async deleteModel(modelId) {
+        if (!modelId) throw Error("modelId is undefined");
+        if (fs.existsSync(`${MODEL_STORAGE}${modelId}/`)){
+            fs.rmSync(`${MODEL_STORAGE}${modelId}/`, { recursive: true, force: true });
+        }
     }
 
     copyToBest(phenotype, group){

@@ -14,6 +14,7 @@ from keras.src import callbacks
 import importlib
 import socket
 from datetime import datetime, timedelta
+import numpy as np
 
 SETTINGS = { "TEST_MODE" : False}
 
@@ -46,19 +47,22 @@ def guidGenerator():
     return str(uuid.uuid4())                                                  
 
 
-class CustomEarlyStopCallback(callbacks.Callback):
-    train_logs = []
-    loss_threshold_abort = False
-    training_start_time = datetime.now()
-    epoch_time_start = datetime.now()
-    stopped_epoch = 1
-    
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
+
+class CustomEarlyStopCallback(callbacks.Callback):   
     def __init__(self, model_training_time_threshold, baseline, phenotype, wguid):
         self.model_training_time_threshold = model_training_time_threshold
         self.baseline = baseline
         self.phenotype = phenotype
         self.wguid = wguid
         print(f"CustomEarlyStopCallback. model_training_time_threshold {model_training_time_threshold},  baseline {baseline}")
+        self.training_start_time = datetime.now()
+        self.epoch_time_start = datetime.now()
+        self.stopped_epoch = 1
 
     def on_epoch_begin(self, epoch, logs=None):
         self.epoch_time_start = datetime.now()
@@ -69,10 +73,13 @@ class CustomEarlyStopCallback(callbacks.Callback):
         if self.model_training_time_threshold is not None: 
             time_delta = timedelta(seconds=self.model_training_time_threshold)
             if datetime.now() > self.training_start_time + time_delta:
-                print(f"Model training timeout abort. Epoch {epoch} ")
+                print(f"Model training timeout abort. Epoch {self.stopped_epoch}")
+                print(f"Start Time {self.training_start_time} Threshold {self.training_start_time + time_delta}, now {datetime.now()}")
+                print(f"self.model_training_time_threshold {self.model_training_time_threshold}")
+                print(f"=======================================================================")
                 self.model.stop_training = True
         if self.baseline is not None and ((logs.get('loss') is not None and logs.get('loss') > self.baseline) or (logs.get('val_loss') is not None and logs.get('val_loss') > self.baseline)):  
-            print(f"Early threshold abort. Epoch {epoch} ")
+            print(f"Early threshold abort. Epoch {self.stopped_epoch} ")
             self.model.stop_training = True    
             time.sleep(5)                   
 
@@ -220,13 +227,14 @@ def trainModel(wguid, model, workerdata, trainDS, trainDS_genRes, trainValidatio
                                                         mode='min',
                                                         restore_best_weights=True)  
     
-    custom_early_stopping = CustomEarlyStopCallback(workerdata["modelTrainingTimeThreshold"], workerdata["baseline"], workerdata["phenotype"], wguid)
+    custom_early_stopping = CustomEarlyStopCallback(workerdata.get("modelTrainingTimeThreshold"), workerdata.get("baseline"), workerdata["phenotype"], wguid)
 
     history = model.fit(trainDS, epochs=workerdata["phenotype"]["epochs"], steps_per_epoch = trainDS_genRes.maxBatchIndex - trainDS_genRes.minBatchIndex + 1, validation_steps = trainValidationDS_genRes.maxBatchIndex - trainValidationDS_genRes.minBatchIndex + 1,
                         validation_data=trainValidationDS,
                         callbacks=[early_stopping, callbacks.TerminateOnNaN(), custom_early_stopping])  
     
     val_performance = model.evaluate(validationDS, return_dict=True)
+    predictions = model.predict(validationDS)
     loss = val_performance["loss"]
     if min(early_stopping.best_epoch, early_stopping.stopped_epoch) > 0:        
         print(f'adjusted epoch: original: {workerdata["phenotype"]["epochs"]}, new: {min(early_stopping.best_epoch, early_stopping.stopped_epoch)}')
@@ -242,8 +250,11 @@ def trainModel(wguid, model, workerdata, trainDS, trainDS_genRes, trainValidatio
     jsonStr = None
     with open(keras_model_path, 'rb') as file:
         jsonStr = file.read().hex()  
+    
+    validationDS_labels = np.concatenate([y for x, y in validationDS], axis=0)
 
-    res = { "validationLoss": loss, "phenotype": workerdata["phenotype"], "modelJson": jsonStr }
+    predictionsJson = json.dumps([predictions,validationDS_labels], cls=NumpyEncoder)
+    res = { "validationLoss": loss, "phenotype": workerdata["phenotype"], "predictionsJson": predictionsJson, "modelJson": jsonStr }
 
     return res
 
@@ -363,10 +374,12 @@ def initializers(initializer):
 
 def lossBuilderFunction(loss):
      match loss:
+          case "binaryCrossentropy":
+             return tf.keras.losses.BinaryCrossentropy()
           case "meanAbsoluteError":
-               return tf.keras.losses.MeanAbsoluteError()
+             return tf.keras.losses.MeanAbsoluteError()
           case "meanSquaredError":
-               return tf.keras.losses.MeanSquaredError()
+             return tf.keras.losses.MeanSquaredError()
 
 def main():  
     global SETTINGS, RABBITMQ_HOST, RABBITMQ_PORT, inputQueue, outputQueuePrefix

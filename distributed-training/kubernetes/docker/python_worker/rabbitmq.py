@@ -44,4 +44,4 @@ class RabbitMQ:
                                    properties=pika.BasicProperties(
                                        delivery_mode=2,  # make message persistent
                                    ))
-        print(f"Sent message to queue {queue_name}: {message}")
+        print(f"Sent message to queue {queue_name}")
